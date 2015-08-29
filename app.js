@@ -1798,11 +1798,8 @@ var ToggleAutomaticRoll1 = React.createClass({
         worldStore.off('change', this._onStoreChange);
     },
   _displayAutomatic: function(){
-        return function () {
-          Dispatcher.sendAction("TOGGLE_SHOW_AUTOMATIC_ROLL");
-        };
-        
-        //this.forceUpdate();
+        Dispatcher.sendAction("TOGGLE_SHOW_AUTOMATIC_ROLL");
+        this.forceUpdate();
   },
   render: function() { 
     return  el.div(null,
@@ -2291,6 +2288,7 @@ var ToggleAutomaticRoll = React.createClass({
                   )
           
         );
+        this.forceUpdate();
     }
 });
 
