@@ -4,13 +4,13 @@
 
 var config = {
   // - Your app's id on moneypot.com
-  app_id: 497,                             // <----------------------------- EDIT ME!
+  app_id: 578,                             // <----------------------------- EDIT ME!
   // - Displayed in the navbar
   app_name: 'Invest Dice',
   // - For your faucet to work, you must register your site at Recaptcha
   // - https://www.google.com/recaptcha/intro/index.html
   recaptcha_sitekey: '6LfaxAsTAAAAAB-08wFZ6KVZQ9ez_wS7anE0wa1D',  // <----- EDIT ME!
-  redirect_uri: 'https://investdice.github.io',
+  redirect_uri: 'https://abff.github.io/investdice-abff.github.io',
   mp_browser_uri: 'https://www.moneypot.com',
   mp_api_uri: 'https://api.moneypot.com',
   chat_uri: '//socket.moneypot.com',
@@ -2823,7 +2823,6 @@ var App = React.createClass({
         el.div(
           {className: 'col-sm-5'},
           React.createElement(BetBox, null),
-          !betStore.state.showAutomaticRoll ? React.createElement(BetBoxRoll, null) : ''
         ),
         el.div(
           {className: 'col-sm-7'},
