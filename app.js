@@ -258,7 +258,7 @@ var MoneyPot = (function() {
   };
 
   // gRecaptchaResponse is string response from google server
-  // `callbacks.success` signature	is fn({ claim_id: Int, amoutn: Satoshis })
+  // `callbacks.success` signature  is fn({ claim_id: Int, amoutn: Satoshis })
   o.claimFaucet = function(gRecaptchaResponse, callbacks) {
     console.log('Hitting POST /claim-faucet');
     var endpoint = '/claim-faucet';
@@ -624,7 +624,7 @@ var betStore = new Store('bet', {
         self.emitter.emit('change', self.state);
     });
     Dispatcher.registerCallback("AUGMENT_PROFIT", function(multi){
-        var profitQuantity = betStore.state.profitGained.num + (betStore.state.profitGained.num * Number(multi));
+        var profitQuantity = (betStore.state.profitGained.num * Number(multi));
         var balanceQuantity = worldStore.state.user.balance / 100;
         if(balanceQuantity > profitQuantity){
             betStore.state.profitGained.num = profitQuantity;
