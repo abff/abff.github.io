@@ -1929,7 +1929,7 @@ var ToggleAutomaticRoll = React.createClass({
                   var hash = betStore.state.nextHash;
                   console.assert(typeof hash === 'string');
                   
-                  var wagerSatoshis = betStore.state.profitGained.num * 100;
+                  var wagerSatoshis = betStore.state.wager.num * 100;
                   var multiplier = betStore.state.multiplier.num;
                   var payoutSatoshis = wagerSatoshis * multiplier;
                   
