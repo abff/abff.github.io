@@ -591,15 +591,15 @@ var betStore = new Store('bet', {
         if(betStore.state.checkBoxNumberOfBet === 'true' && betStore.state.betCounter == self.state.NumberOfBetLimit.str){
             Dispatcher.sendAction('STOP_ROLL');
         }else if (!isNaN(parseInt(betStore.state.stopMinBalance))) {
-            console.log(betStore.state.stopMinBalance);
-            if (betStore.state.stopMinBalance >= (worldStore.state.user.balance / 100)) {
+            var balance = betStore.state.stopMinBalance / 100;
+            if (betStore.state.stopMinBalance >= balance) {
               console.log('b past');
               Dispatcher.sendAction('STOP_ROLL');
             }else {
               betStore.state.betCounter++;
             } 
         }else if (!isNaN(parseInt(betStore.state.stopMaxBalance))) {
-            if (betStore.state.stopMaxBalance <= (worldStore.state.user.balance / 100)) {
+            if (betStore.state.stopMaxBalance <= balance) {
               Dispatcher.sendAction('STOP_ROLL');
             }else {
               betStore.state.betCounter++;
