@@ -1854,7 +1854,7 @@ var ToggleAutomaticRoll = React.createClass({
   },
   _increaseOnLose: function(e){
       Dispatcher.sendAction("SET_INCREASE_ON_LOSE", e.currentTarget.value);
-      this.forceUpdate();
+      el.forceUpdate();
   },
     _increaseOnWin: function(e){
         Dispatcher.sendAction("SET_INCREASE_ON_WIN", e.currentTarget.value);
