@@ -591,7 +591,7 @@ var betStore = new Store('bet', {
         if(betStore.state.checkBoxNumberOfBet === 'true' && betStore.state.betCounter == self.state.NumberOfBetLimit.str){
             Dispatcher.sendAction('STOP_ROLL');
         }else if (!isNaN(parseInt(betStore.state.stopMinBalance))) {
-          //if((worldStore.state.user.balance / 100) >= betStore.state.stopMaxBalance || (worldStore.state.user.balance / 100) <= betStore.state.stopMinBalance)
+            console.log('a pasttt');
             if (betStore.state.stopMinBalance >= (worldStore.state.user.balance / 100)) {
               Dispatcher.sendAction('STOP_ROLL');
             }else {
