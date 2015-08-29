@@ -631,7 +631,8 @@ var betStore = new Store('bet', {
         self.emitter.emit('change', self.state);
     });
     Dispatcher.registerCallback("SET_MULTI_ON_LOSE", function(multiOnLose){
-        betStore.state.multiOnLose = multiOnLose;
+        var n = parseInt(multiOnLose, 10);
+        betStore.state.multiOnLose = n;
         self.emitter.emit('change', self.state);
     });
     
@@ -2088,7 +2089,7 @@ var ToggleAutomaticRoll = React.createClass({
                                         el.span(null,
                                             el.span(null)
                                         ),
-                                        el.label(null, "Amount")
+                                        el.label(null, "Limit")
                                     ),
                                     el.div(
                                       {className: 'input-group'},
@@ -2116,7 +2117,8 @@ var ToggleAutomaticRoll = React.createClass({
                 el.div({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
                     el.div({className:'automateBackground'},
                         el.div({className:'row'},
-                            el.div({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12 input-group'},
+                            el.div({className: 'col-lg-3 col-md-3 col-sm-3 col-xs-3'}, '&nbsp;'),
+                            el.div({className:'col-lg-6 col-md-6 col-sm-6 col-xs-6 input-group'},
                                     el.input(
                                         {
                                             type:'text',
@@ -2129,7 +2131,8 @@ var ToggleAutomaticRoll = React.createClass({
                                         {className: 'input-group-addon'},
                                         'X'
                                     )
-                                )
+                              ),
+                              el.div({className: 'col-lg-3 col-md-3 col-sm-3 col-xs-3'}, '&nbsp;'),
                             )
                       )   
                   ),
