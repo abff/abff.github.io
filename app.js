@@ -1803,7 +1803,7 @@ var ToggleAutomaticRoll1 = React.createClass({
   render: function() { 
     return  el.div(null,
                 el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-                    el.h5(null,el.span(null, "Automated Betting"))
+                    el.h5(null,el.span(null, "Auto-Bet"))
             ),
                 el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
                     el.div({className:'buttonMoreCenter'},
@@ -1840,11 +1840,6 @@ var ToggleAutomaticRoll = React.createClass({
   _AutomaticToggle: function(){
         Dispatcher.sendAction('AUTOMATIC_BET_WAGER_STATE');
         this.forceUpdate();
-  },
-  _speedOfBet: function(e){
-      console.log(e.currentTarget.value);
-      Dispatcher.sendAction("SET_SPEED_OF_BETS", e.currentTarget.value);
-      this.forceUpdate();
   },
   _numberOfBet: function(e){
       console.log(e.currentTarget.value);
@@ -2078,51 +2073,6 @@ var ToggleAutomaticRoll = React.createClass({
                     )
                   ),
                   el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-                      el.p(null, "Select your betting speed")
-                  ),
-                  el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-                    el.div({className:'speedBackground'},
-                        el.ul({className:'row'},
-                            el.li({className:'col-lg-5 col-md-5 col-sm-6 col-xs-6'},
-                                el.input(
-                                    {
-                                            id: 'radioStyle',
-                                            name: 'speedOfBet',
-                                            type: 'radio',
-                                            defaultChecked: "checked",
-                                            onChange: this._speedOfBet,
-                                            value: 'false'
-                                    }
-                                    ),
-                                    el.label({className:'radioPureCSS1'},
-                                        el.span(null,
-                                            el.span(null)
-                                        ),
-                                        el.label(null, "Average")
-                                       
-                                    )
-                                ),
-                                el.li({className:'col-lg-7 col-md-7 col-sm-6 col-xs-6'},
-                                el.input(
-                                    {
-                                       id: 'radioStyle',
-                                       name: 'speedOfBet',
-                                       type: 'radio',
-                                       onChange: this._speedOfBet,
-                                       value: 'true'
-                                    }
-                                    ),
-                                    el.label({className:'radioPureCSS1'},
-                                        el.span(null,
-                                            el.span(null)
-                                        ),
-                                        el.label(null, "Sharp Speed!")
-                                    )
-                                )
-                            )
-                      )   
-                  ),
-                  el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
                       el.p(null, "Limit number of Bets")
                   ),
                 el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
@@ -2286,7 +2236,6 @@ var ToggleAutomaticRoll = React.createClass({
                   )
           
         );
-      this.forceUpdate();
     }
 });
 
