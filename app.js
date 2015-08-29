@@ -1810,6 +1810,7 @@ var ToggleAutomaticRoll1 = React.createClass({
                     el.div({className:'buttonMoreCenter'},
                         el.a(
                               {
+                                    href: 'javascript:void(0)',
                                     onClick: this._displayAutomatic,
                                     className: 'btn buttonMore',
                                     type: 'button',
