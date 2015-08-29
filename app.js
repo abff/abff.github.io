@@ -639,6 +639,7 @@ var betStore = new Store('bet', {
             betStore.state.profitGained.num = Number(betStore.state.profitGained.num.toFixed(0));
         }else{
             Dispatcher.sendAction("STOP_ROLL");
+            setTimeout(console.log('delayed'), 1000);
         }
         self.emitter.emit('change', self.state);
     });
