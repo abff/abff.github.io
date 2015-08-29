@@ -1896,9 +1896,11 @@ var ToggleAutomaticRoll = React.createClass({
   },
   _setStopMaxBalance: function(e){
     Dispatcher.sendAction("SET_STOP_MAX_BALANCE", e.currentTarget.value);
+    this.forceUpdate();
   },
   _setStopMinBalance: function(e){
     Dispatcher.sendAction("SET_STOP_MIN_BALANCE", e.currentTarget.value);
+    this.forceUpdate();
   },
   _newLimitNumberOfBet: function(e){
       console.log(betStore.state.disableNumberOfBet + "nuevo limite");
