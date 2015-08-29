@@ -2220,8 +2220,8 @@ var ToggleAutomaticRoll = React.createClass({
                                         {
                                             type:'text',
                                             className:'returnAmount form-control input-lg',
-                                            onChange: this._setStopMixBalance,
-                                            value: betStore.state.stopMixBalance
+                                            onChange: this._setStopMinBalance,
+                                            value: betStore.state.stopMinBalance
                                         }
                                     ),
                                     el.span(
