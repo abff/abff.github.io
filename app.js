@@ -2101,6 +2101,23 @@ var ToggleAutomaticRoll = React.createClass({
                                         el.label(null, "Average")
                                        
                                     )
+                                ),
+                                el.li({className:'col-lg-7 col-md-7 col-sm-6 col-xs-6'},
+                                el.input(
+                                    {
+                                       id: 'radioStyle',
+                                       name: 'speedOfBet',
+                                       type: 'radio',
+                                       onChange: this._speedOfBet,
+                                       value: 'true'
+                                    }
+                                    ),
+                                    el.label({className:'radioPureCSS1'},
+                                        el.span(null,
+                                            el.span(null)
+                                        ),
+                                        el.label(null, "Sharp Speed!")
+                                    )
                                 )
                             )
                       )   
