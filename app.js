@@ -2286,6 +2286,7 @@ var ToggleAutomaticRoll = React.createClass({
                   )
           
         );
+      this.forceUpdate();
     }
 });
 
