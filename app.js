@@ -2146,57 +2146,28 @@ var ToggleAutomaticRoll = React.createClass({
                             )
                       )   
                   ),
-                  el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-                      el.p(null, "On Win")
+                  el.div({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                      el.p(null, "Multiplier On Win")
                   ),
-                el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                el.div({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
                     el.div({className:'automateBackground'},
-                        el.ul({className:'row'},
-                            el.li({className:'col-lg-5 col-md-5 col-sm-6 col-xs-6'},
-                                el.input(
-                                    {
-                                       id: 'radioStyle',
-                                       name: 'returnOnLose',
-                                       type: 'radio',
-                                       defaultChecked: "checked",
-                                       onChange: this._increaseOnWin,
-                                       value: false
-                                    }
-                                    ),
-                                    el.label({className:'radioPureCSS1'},
-                                        el.span(null,
-                                            el.span(null)
-                                        ),
-                                        el.label(null, "Return to Base")
-                                       
-                                    )
-                                ),
-                                el.li({className:'col-lg-7 col-md-7 col-sm-6 col-xs-6'},
-                                el.input(
-                                    {
-                                       id: 'radioStyle',
-                                       name: 'returnOnLose',
-                                       type: 'radio',
-                                       onChange: this._increaseOnWin,
-                                       value: true
-                                    }
-                                    ),
-                                    el.label({className:'radioPureCSS1'},
-                                        el.span(null,
-                                            el.span(null)
-                                        ),
-                                        el.label(null, "Increase Bet")
-                                    ),
-                                    el.label({className:'autoRollInputLabel'}, "x"),
+                        el.div({className:'row'},
+                            el.div({className: 'col-lg-3 col-md-3 col-sm-3 col-xs-3'}, ' '),
+                            el.div({className:'col-lg-6 col-md-6 col-sm-6 col-xs-6 input-group'},
                                     el.input(
                                         {
                                             type:'text',
-                                            className:'returnAmount',
+                                            className:'returnAmount form-control input-lg',
                                             onChange: this._setMultiOnWin,
                                             value: betStore.state.multiOnWin
                                         }
+                                    ),
+                                    el.span(
+                                        {className: 'input-group-addon'},
+                                        'X'
                                     )
-                                )
+                              ),
+                              el.div({className: 'col-lg-3 col-md-3 col-sm-3 col-xs-3'}, ' ')
                             )
                       )   
                   )
