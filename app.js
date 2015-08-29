@@ -1,4 +1,4 @@
-// Untitled Dice v0.0.6
+/ Untitled Dice v0.0.8
 
 // Customize these configuration settings:
 
@@ -9,9 +9,8 @@ var config = {
   app_name: 'Invest Dice',
   // - For your faucet to work, you must register your site at Recaptcha
   // - https://www.google.com/recaptcha/intro/index.html
-  recaptcha_sitekey: '6LcQqAoTAAAAAP6DRYEFBw6M4xQXsxMBX94tODde',  // <----- EDIT ME!
+  recaptcha_sitekey: '6LfaxAsTAAAAAB-08wFZ6KVZQ9ez_wS7anE0wa1D',  // <----- EDIT ME!
   redirect_uri: 'https://abff.github.io/',
-  //redirect_uri: 'http://localhost:5000',
   mp_browser_uri: 'https://www.moneypot.com',
   mp_api_uri: 'https://api.moneypot.com',
   chat_uri: '//socket.moneypot.com',
@@ -19,11 +18,38 @@ var config = {
   debug: isRunningLocally(),
   // - Set this to true if you want users that come to http:// to be redirected
   //   to https://
-  force_https_redirect: !isRunningLocally()
+  force_https_redirect: !isRunningLocally(),
+  // - Configure the house edge (default is 1%)
+  //   Must be between 0.0 (0%) and 1.0 (100%)
+  house_edge: 0.009,
+  chat_buffer_size: 50,
+  // - The amount of bets to show on screen in each tab
+  bet_buffer_size: 50
 };
 
 ////////////////////////////////////////////////////////////
 // You shouldn't have to edit anything below this line
+////////////////////////////////////////////////////////////
+
+// Validate the configured house edge
+(function() {
+  var errString;
+
+  if (config.house_edge <= 0.0) {
+    errString = 'House edge must be > 0.0 (0%)';
+  } else if (config.house_edge >= 100.0) {
+    errString = 'House edge must be < 1.0 (100%)';
+  }
+
+  if (errString) {
+    alert(errString);
+    throw new Error(errString);
+  }
+
+  // Sanity check: Print house edge
+  console.log('House Edge:', (config.house_edge * 100).toString() + '%');
+})();
+
 ////////////////////////////////////////////////////////////
 
 if (config.force_https_redirect && window.location.protocol !== "https:") {
@@ -32,7 +58,7 @@ if (config.force_https_redirect && window.location.protocol !== "https:") {
 
 // Hoist it. It's impl'd at bottom of page.
 var socket;
-var allBetsArray;
+
 // :: Bool
 function isRunningLocally() {
   return /^localhost/.test(window.location.host);
@@ -48,7 +74,6 @@ var genUuid = function() {
   });
 };
 
-var maxBankRoll;
 var helpers = {};
 
 // For displaying HH:MM timestamp in chat
@@ -61,52 +86,15 @@ helpers.formatDateToTime = function(dateJson) {
     _.padLeft(date.getMinutes().toString(), 2, '0');
 };
 
-helpers.houseEdge = function(){
-    //a
-    var profit = betStore.state.wager.num * (betStore.state.multiplier.num - 1);
-    return helpers.roundDown(0.9998- (profit * 100 / Number(maxBankRoll)), 3) ;
-};
-    
-helpers.roundDown = function(number, quantityZero) {
-    var totalMultiplier = 1;
-    for(i = 0; i< quantityZero; i++){
-        totalMultiplier = totalMultiplier * 10;
-    }
-    return (Math.floor(number*totalMultiplier)) / totalMultiplier;
-};
-
-//get a total of bankRoll and set in maxBankRoll
-helpers.calcHouseEdge = function(){
-    if(worldStore.state.user){
-        MoneyPot.getBankRoll({
-          success: function(data) {
-            console.log('Successfully loaded Bank roll', data);
-            maxBankRoll = data.balance;
-          },
-          error: function(err) {
-            console.log('Error:', err);
-          },
-          complete: function() {
-            console.log('complete');
-          }
-        },worldStore.state.access_token);
-    }
-    
-};
-
 // Number -> Number in range (0, 1)
 helpers.multiplierToWinProb = function(multiplier) {
-    console.assert(typeof multiplier === 'number');
-    console.assert(multiplier > 0);
-    //houseEdge in decimals format
-    // the min value is 0.1
-    var he = (100 - (helpers.houseEdge() * 100)).toFixed(2);
-    if(he < 1){
-        he = he * 1.05;
-        //again with decimals
-        he = (100 - he) / 100;
-    }
-    return he / multiplier;
+  console.assert(typeof multiplier === 'number');
+  console.assert(multiplier > 0);
+
+  // For example, n is 0.99 when house edge is 1%
+  var n = 1.0 - config.house_edge;
+
+  return n / multiplier;
 };
 
 helpers.calcNumber = function(cond, winProb) {
@@ -114,9 +102,9 @@ helpers.calcNumber = function(cond, winProb) {
   console.assert(typeof winProb === 'number');
 
   if (cond === '<') {
-    return helpers.roundDown(winProb, 4) * 100;
+    return winProb * 100;
   } else {
-    return 99.99 - (helpers.roundDown(winProb, 4) * 100);
+    return 99.99 - (winProb * 100);
   }
 };
 
@@ -125,9 +113,9 @@ helpers.roleToLabelElement = function(role) {
     case 'ADMIN':
       return el.span({className: 'label label-danger'}, 'MP Staff');
     case 'MOD':
-      return el.span({className: 'label label-info'}, 'Mod');
+      return el.span({className: 'label label-info'}, '☆Mod☆');
     case 'OWNER':
-      return el.span({className: 'label label-primary'}, 'Owner');
+      return el.span({className: 'label label-primary'}, '★Owner★');
     default:
       return '';
   }
@@ -161,9 +149,50 @@ helpers.getPrecision = function(num) {
     (match[2] ? +match[2] : 0));
 };
 
+/**
+ * Decimal adjustment of a number.
+ *
+ * @param {String}  type  The type of adjustment.
+ * @param {Number}  value The number.
+ * @param {Integer} exp   The exponent (the 10 logarithm of the adjustment base).
+ * @returns {Number} The adjusted value.
+ */
+helpers.decimalAdjust = function(type, value, exp) {
+  // If the exp is undefined or zero...
+  if (typeof exp === 'undefined' || +exp === 0) {
+    return Math[type](value);
+  }
+  value = +value;
+  exp = +exp;
+  // If the value is not a number or the exp is not an integer...
+  if (isNaN(value) || !(typeof exp === 'number' && exp % 1 === 0)) {
+    return NaN;
+  }
+  // Shift
+  value = value.toString().split('e');
+  value = Math[type](+(value[0] + 'e' + (value[1] ? (+value[1] - exp) : -exp)));
+  // Shift back
+  value = value.toString().split('e');
+  return +(value[0] + 'e' + (value[1] ? (+value[1] + exp) : exp));
+}
+
+helpers.round10 = function(value, exp) {
+  return helpers.decimalAdjust('round', value, exp);
+};
+
+helpers.floor10 = function(value, exp) {
+  return helpers.decimalAdjust('floor', value, exp);
+};
+
+helpers.ceil10 = function(value, exp) {
+  return helpers.decimalAdjust('ceil', value, exp);
+};
+
 ////////////////////////////////////////////////////////////
 
-// A weak MoneyPot API abstraction
+// A weak Moneypot API abstraction
+//
+// Moneypot's API docs: https://www.moneypot.com/api-docs
 var MoneyPot = (function() {
 
   var o = {};
@@ -173,33 +202,43 @@ var MoneyPot = (function() {
   // method: 'GET' | 'POST' | ...
   // endpoint: '/tokens/abcd-efgh-...'
   var noop = function() {};
-  var makeMPRequest = function(method, bodyParams, endpoint, callbacks, params) {
+  var makeMPRequest = function(method, bodyParams, endpoint, callbacks, overrideOpts) {
 
     if (!worldStore.state.accessToken)
       throw new Error('Must have accessToken set to call MoneyPot API');
-    
-    var queryStringParams = '';
-    if (params !== undefined) {
-        for ( var ind in params) {
-            queryStringParams += '&' + params[ind].field + '=' + params[ind].value;
-        }
-    }
-    
-    var url = config.mp_api_uri + '/' + o.apiVersion + endpoint +
-              '?access_token=' + worldStore.state.accessToken + queryStringParams;
 
-    $.ajax({
+    var url = config.mp_api_uri + '/' + o.apiVersion + endpoint;
+
+    if (worldStore.state.accessToken) {
+      url = url + '?access_token=' + worldStore.state.accessToken;
+    }
+
+    var ajaxOpts = {
       url:      url,
       dataType: 'json', // data type of response
       method:   method,
       data:     bodyParams ? JSON.stringify(bodyParams) : undefined,
+      // By using text/plain, even though this is a JSON request,
+      // we avoid preflight request. (Moneypot explicitly supports this)
       headers: {
         'Content-Type': 'text/plain'
       },
       // Callbacks
-      success:  callbacks.success  || noop,
-      error:    callbacks.error    || noop,
+      success:  callbacks.success || noop,
+      error:    callbacks.error || noop,
       complete: callbacks.complete || noop
+    };
+
+    $.ajax(_.merge({}, ajaxOpts, overrideOpts || {}));
+  };
+
+  o.listBets = function(callbacks) {
+    var endpoint = '/list-bets';
+    makeMPRequest('GET', undefined, endpoint, callbacks, {
+      data: {
+        app_id: config.app_id,
+        limit: config.bet_buffer_size
+      }
     });
   };
 
@@ -239,29 +278,6 @@ var MoneyPot = (function() {
     makeMPRequest('POST', bodyParams, endpoint, callbacks);
   };
 
-  // get list of betsa plication
-  o.getListBets = function(callbacks, limit) {
-    var endpoint = '/list-bets';
-    
-    var params = [
-            {
-                field: "app_id",
-                value: config.app_id
-            },
-            {
-                field: "limit",
-                value: limit
-            }
-        ];
-        
-    makeMPRequest('GET', undefined, endpoint, callbacks, params);
-  };
-  
-  o.getBankRoll = function(callbacks) {
-    var endpoint = '/bankroll';
-    makeMPRequest('GET', undefined, endpoint, callbacks);
-  };
-  
   return o;
 })();
 
@@ -374,7 +390,7 @@ if (window.history && window.history.replaceState) {
 ////////////////////////////////////////////////////////////
 
 var chatStore = new Store('chat', {
-  messages: new CBuffer(250),
+  messages: new CBuffer(config.chat_buffer_size),
   waitingForServer: false,
   userList: {},
   showUserList: false,
@@ -383,28 +399,28 @@ var chatStore = new Store('chat', {
   var self = this;
 
   // `data` is object received from socket auth
-    Dispatcher.registerCallback('INIT_CHAT', function(data) {
-        console.log('[ChatStore] received INIT_CHAT');
-        // Give each one unique id
-        var messages = data.chat.messages.map(function(message) {
-          message.id = genUuid();
-          return message;
-        });
-    
-        // Reset the CBuffer since this event may fire multiple times,
-        // e.g. upon every reconnection to chat-server.
-        self.state.messages.empty();
-    
-        self.state.messages.push.apply(self.state.messages, messages);
-    
-        // Indicate that we're done with initial fetch
-        self.state.loadingInitialMessages = false;
-    
-        // Load userList
-        self.state.userList = data.chat.userlist;
-        self.emitter.emit('change', self.state);
-        self.emitter.emit('init');
+  Dispatcher.registerCallback('INIT_CHAT', function(data) {
+    console.log('[ChatStore] received INIT_CHAT');
+    // Give each one unique id
+    var messages = data.chat.messages.map(function(message) {
+      message.id = genUuid();
+      return message;
     });
+
+    // Reset the CBuffer since this event may fire multiple times,
+    // e.g. upon every reconnection to chat-server.
+    self.state.messages.empty();
+
+    self.state.messages.push.apply(self.state.messages, messages);
+
+    // Indicate that we're done with initial fetch
+    self.state.loadingInitialMessages = false;
+
+    // Load userList
+    self.state.userList = data.chat.userlist;
+    self.emitter.emit('change', self.state);
+    self.emitter.emit('init');
+  });
 
   Dispatcher.registerCallback('NEW_MESSAGE', function(message) {
     console.log('[ChatStore] received NEW_MESSAGE');
@@ -433,17 +449,6 @@ var chatStore = new Store('chat', {
     console.log('[ChatStore] received USER_LEFT:', user);
     delete self.state.userList[user.uname];
     self.emitter.emit('change', self.state);
-  });
-
-  Dispatcher.registerCallback('NEW_SYSTEM_MESSAGE', function(text) {
-    console.log('[ChatStore] received NEW_SYSTEM_MESSAGE');
-    self.state.messages.push({
-      id: genUuid(),
-      text: text,
-      user: {uname: '[SYSTEM]'}
-    });
-    self.emitter.emit('change', self.state);
-    self.emitter.emit('new_message');
   });
 
   // Message is { text: String }
@@ -486,8 +491,8 @@ var betStore = new Store('bet', {
   automaticToggle: false,
   increaseOnWin: false,
   increaseOnLose: false,
-  percentOnWin:0,
-  percentOnLose:0,
+  multiOnWin:0,
+  multiOnLose:0,
   betCounter: 1,
   checkBoxNumberOfBet: 'false',
   checkSpeedOfBet : 'false',
@@ -502,46 +507,49 @@ var betStore = new Store('bet', {
     num: 1,
     error: undefined
   },
-  showHashPopup: false,
   betVelocity: 500
-  
 }, function() {
   var self = this;
 
-    Dispatcher.registerCallback('SET_NEXT_HASH', function(hexString) {
-        self.state.nextHash = hexString;
-        self.emitter.emit('change', self.state);
-    });
+  Dispatcher.registerCallback('SET_NEXT_HASH', function(hexString) {
+    self.state.nextHash = hexString;
+    self.emitter.emit('change', self.state);
+  });
 
-    Dispatcher.registerCallback('UPDATE_WAGER', function(newWager) {
-        self.state.wager = _.merge({}, self.state.wager, newWager);
-        
-        var n = parseInt(self.state.wager.str, 10);
-        
-        // If n is a number, ensure it's at least 1 bit
-        if (isFinite(n)) {
-          n = Math.max(n, 1);
-          self.state.wager.str = n.toString();
-        }
-        
-        // Ensure wagerString is a number
-        if (isNaN(n) || /[^\d]/.test(n.toString())) {
-          self.state.wager.error = 'INVALID_WAGER';
-        // Ensure user can afford balance
-        } else if (n * 100 > worldStore.state.user.balance) {
-          self.state.wager.error = 'CANNOT_AFFORD_WAGER';
-          self.state.wager.num = n;
-        } else {
-          // wagerString is valid
-          self.state.wager.error = null;
-          self.state.wager.str = n.toString();
-          self.state.wager.num = n;
-        }
-        
-        self.emitter.emit('change', self.state);
-    });
-    
-    Dispatcher.registerCallback('UPDATE_AUTOMATIC_WAGER', function(newWager) {
+  Dispatcher.registerCallback('UPDATE_WAGER', function(newWager) {
+    self.state.wager = _.merge({}, self.state.wager, newWager);
+
+    var n = parseInt(self.state.wager.str, 10);
+
+    // If n is a number, ensure it's at least 1 bit
+    if (isFinite(n)) {
+      n = Math.max(n, 1);
+      self.state.wager.str = n.toString();
+    }
+
+    // Ensure wagerString is a number
+    if (isNaN(n) || /[^\d]/.test(n.toString())) {
+      self.state.wager.error = 'INVALID_WAGER';
+    // Ensure user can afford balance
+    } else if (n * 100 > worldStore.state.user.balance) {
+      self.state.wager.error = 'CANNOT_AFFORD_WAGER';
+      self.state.wager.num = n;
+    } else {
+      // wagerString is valid
+      if (n > 1000000){
+        self.state.wager.error = 'CANNOT_AFFORD_WAGER';
+        self.state.wager.num = n;
+      } else {
+        self.state.wager.error = null;
+        self.state.wager.str = n.toString();
+        self.state.wager.num = n;
+      }
+    }
+
+    self.emitter.emit('change', self.state);
+  });
+
+  Dispatcher.registerCallback('UPDATE_AUTOMATIC_WAGER', function(newWager) {
         self.state.automaticWager = _.merge({}, self.state.automaticWager, newWager);
         
         var n = parseInt(self.state.automaticWager.str, 10);
@@ -606,15 +614,6 @@ var betStore = new Store('bet', {
         self.emitter.emit('change', self.state);
     });
     
-    Dispatcher.registerCallback("SET_SPEED_OF_BETS", function(stateNumberOfBet){
-        betStore.state.checkSpeedOfBet = stateNumberOfBet;
-        if(betStore.state.checkSpeedOfBet === 'true'){
-            betStore.state.betVelocity = 0;
-        }else{
-            betStore.state.betVelocity = 500;
-        }
-        self.emitter.emit('change', self.state);
-    });
     
     Dispatcher.registerCallback("SET_INCREASE_ON_WIN", function(increaseOnWin){
         betStore.state.increaseOnWin = increaseOnWin;
@@ -624,8 +623,8 @@ var betStore = new Store('bet', {
         betStore.state.increaseOnLose = increaseOnLose;
         self.emitter.emit('change', self.state);
     });
-    Dispatcher.registerCallback("AUGMENT_PROFIT", function(percent){
-        var profitQuantity = betStore.state.profitGained.num + (betStore.state.profitGained.num * Number(percent) / 100);
+    Dispatcher.registerCallback("AUGMENT_PROFIT", function(multi){
+        var profitQuantity = betStore.state.profitGained.num + (betStore.state.profitGained.num * Number(multi));
         var balanceQuantity = worldStore.state.user.balance / 100;
         if(balanceQuantity > profitQuantity){
             betStore.state.profitGained.num = profitQuantity;
@@ -635,12 +634,12 @@ var betStore = new Store('bet', {
         }
         self.emitter.emit('change', self.state);
     });
-    Dispatcher.registerCallback("SET_PERCENT_ON_WIN", function(percentOnWin){
-        betStore.state.percentOnWin = percentOnWin;
+    Dispatcher.registerCallback("SET_MULTI_ON_WIN", function(multiOnWin){
+        betStore.state.multiOnWin = multiOnWin;
         self.emitter.emit('change', self.state);
     });
-    Dispatcher.registerCallback("SET_PERCENT_ON_LOSE", function(percentOnLose){
-        betStore.state.percentOnLose = percentOnLose;
+    Dispatcher.registerCallback("SET_MULTI_ON_LOSE", function(multiOnLose){
+        betStore.state.multiOnLose = multiOnLose;
         self.emitter.emit('change', self.state);
     });
     
@@ -658,18 +657,11 @@ var betStore = new Store('bet', {
         self.state.NumberOfBetLimit = _.merge({}, self.state.automaticMultiplierWager, limit);
         self.emitter.emit('change', self.state);
     });
-    
-    
-    Dispatcher.registerCallback('UPDATE_MULTIPLIER', function(newMult) {
-        self.state.multiplier = _.merge({}, self.state.multiplier, newMult);
-        self.emitter.emit('change', self.state);
-    });
-    //show hash popup
-    Dispatcher.registerCallback('TOGGLE_NEXT_HASH_POPUP', function() {
-        console.log('[ChatStore] received TOGGLE_CHAT_USERLIST');
-        self.state.showHashPopup = !self.state.showHashPopup;
-        self.emitter.emit('change', self.state);
-    });
+
+  Dispatcher.registerCallback('UPDATE_MULTIPLIER', function(newMult) {
+    self.state.multiplier = _.merge({}, self.state.multiplier, newMult);
+    self.emitter.emit('change', self.state);
+  });
 });
 
 // The general store that holds all things until they are separated
@@ -680,11 +672,12 @@ var worldStore = new Store('world', {
   accessToken: access_token,
   isRefreshingUser: false,
   hotkeysEnabled: false,
-  currTab: 'MY_BETS',
-  bets: new CBuffer(25),
-  allBets: new CBuffer(25),
-  grecaptcha: undefined,
-  bankRoll : 0
+  currTab: 'ALL_BETS',
+  // TODO: Turn this into myBets or something
+  bets: new CBuffer(config.bet_buffer_size),
+  // TODO: Fetch list on load alongside socket subscription
+  allBets: new CBuffer(config.bet_buffer_size),
+  grecaptcha: undefined
 }, function() {
   var self = this;
 
@@ -728,44 +721,23 @@ var worldStore = new Store('world', {
     console.assert(typeof tabName === 'string');
     self.state.currTab = tabName;
     self.emitter.emit('change', self.state);
-    console.log(self.state);
-    if(tabName == 'ALL_BETS')
-    {
-        console.log("tab all bets selected");
-        Dispatcher.sendAction('REFERSH_ALL_BETS');
-    }
-    
   });
 
-  Dispatcher.registerCallback('REFERSH_ALL_BETS',function(){
-    self.state.isRefreshingUser = true;
-    self.emitter.emit('change', self.state);
-    
-    MoneyPot.getListBets({
-      success: function(data) {
-          
-          self.state.allBets = new CBuffer(25);
-        for(var i in data){
-            self.state.allBets.push(data[i]);
-        }
-        
-        console.log('Successfully loaded list of bets', data);
-        self.emitter.emit('change', self.state);
-      },
-      error: function(err) {
-        console.log('Error:', err);
-      },
-      complete: function() {
-        console.log('complete');
-      }
-    },
-    25);
-    
-  });
-
+  // This is only for my bets? Then change to 'NEW_MY_BET'
   Dispatcher.registerCallback('NEW_BET', function(bet) {
     console.assert(typeof bet === 'object');
     self.state.bets.push(bet);
+    self.emitter.emit('change', self.state);
+  });
+
+  Dispatcher.registerCallback('NEW_ALL_BET', function(bet) {
+    self.state.allBets.push(bet);
+    self.emitter.emit('change', self.state);
+  });
+
+  Dispatcher.registerCallback('INIT_ALL_BETS', function(bets) {
+    console.assert(_.isArray(bets));
+    self.state.allBets.push.apply(self.state.allBets, bets);
     self.emitter.emit('change', self.state);
   });
 
@@ -811,24 +783,6 @@ var worldStore = new Store('world', {
 
 });
 
-
-var footerStore = new Store('footer', {
-    classNameImage: '',
-    showFooterPopup: false,
-}, function() {
-  var footerState = this;
-
-    // TODO: Consider making these emit events unique to each callback
-    // for more granular reaction.
-    //show footer popup
-    Dispatcher.registerCallback('TOGGLE_FOOTER_POPUP', function(className) {
-        footerStore.state.classNameImage = className;
-        console.log('[footerStore] received TOGGLE_FOOTER_POPUP');
-        footerState.state.showFooterPopup = !footerState.state.showFooterPopup;
-        footerState.emitter.emit('change', footerState.state);
-    });
-    
-});
 ////////////////////////////////////////////////////////////
 
 
@@ -849,9 +803,6 @@ var UserBox = React.createClass({
   },
   _onLogout: function() {
     Dispatcher.sendAction('USER_LOGOUT');
-  },
-  _onChangeHash: function(){
-      Dispatcher.sendAction('TOGGLE_NEXT_HASH_POPUP');
   },
   _onRefreshUser: function() {
     Dispatcher.sendAction('START_REFRESHING_USER');
@@ -891,184 +842,129 @@ var UserBox = React.createClass({
         'Loading...'
       );
     } else if (worldStore.state.user) {
-      innerNode = 
-		el.div({className: 'row'},
-					el.div({className: 'col-lg-7 col-md-7 col-sm-12 col-xs-12'},
-						el.div({className: 'row'},
-							el.div({className: 'col-lg-6 col-md-6 col-sm-8 col-xs-8'},
-								el.div({className: 'deposit-withdraw'},
-									// Deposit/Withdraw popup buttons
-									el.a(
-										{
-										href: '/',
-										type: 'button',
-										className: 'dps-drw-left ' + (betStore.state.wager.error === 'CANNOT_AFFORD_WAGER' ? 'deposit-success' : 'deposit'),
-										onClick: this._openDepositPopup
-										},
-										el.span(null,'Deposit')
-										
-									),
-									el.a(
-										{
-										href: '/',
-										type: 'button',
-										className: 'dps-drw-right deposit',
-										onClick: this._openWithdrawPopup
-										},
-										el.span(null,'Withdraw')
-										
-									),
-                                    el.div({className: 'availableBits'},
-                                        // Balance
-                                        el.div(
-                                            {
-                                                className: 'navbar-text',
-                                                style: {marginRight: '5px', width:'100%'}
-                                            },
-                                            el.span(null,
-                                                Number(worldStore.state.user.balance.toFixed(0)) / 100 + ' bits',
-                                                el.button(
-                                                    {
-                                                    className: 'buttonRefresh',
-                                                    title: 'Refresh Balance',
-                                                    disabled: worldStore.state.isRefreshingUser,
-                                                    onClick: this._onRefreshUser
-                                                    },
-                                                    el.span({className: 'glyphicon glyphicon-refresh'})
-                                                )
-                                            
-                                            )
-                                        )
-                                        
-                                    )
-        								// Refresh button
-								)
-							),
-                			el.div({className: 'col-lg-6 col-md-6 col-sm-4 col-xs-4'},
-                				// Logged in as...
-                				el.span({className: 'navbar-text userName'},
-                				  'Logged in as ',
-                				  el.code(null, worldStore.state.user.uname)
-                				)
-                			)	
-						)
-					),
-					el.div({className: 'col-lg-5 col-md-5 col-sm-12 col-xs-12'},
-					    el.div({className:'row'},
-					        el.div({className: 'col-lg-3 col-md-3 col-sm-6 col-xs-6'},
-            						// popup hash
-        						el.a(
-        							{
-        							href: '#',
-        							onClick: this._onChangeHash,
-        							className: 'blue'
-        							},
-        							el.span({className: 'balance'})
-        							
-        						)
-            					),
-            					el.div({className: 'col-lg-6 col-md-6 col-sm-6 col-xs-6'},
-            						el.div(null,
-            							el.a({
-            								href: config.mp_browser_uri + '/apps/' + config.app_id,
-            								target: '_blank',
-            								className: 'blue'
-            								},
-            								// External site glyphicon
-            								el.span({className: 'glyphicon glyphicon-new-window'}
-            								),
-            								el.span(null,
-            									
-            									'View on Moneypot'
-            								)
-            							)
-            						)
-            					),
-            					el.div({className: 'col-lg-3 col-md-3 col-sm-12 col-xs-12'},
-            						// Logout button
-            						el.a(
-            							{
-            							href: '/',
-            							onClick: this._onLogout,
-            							className: 'red'
-            							},
-            							el.span({className: 'glyphicon glyphicon-off'})
-            							
-        						)
-        					)
-					    )
-					
-					)
-					
-		
-		);
+      innerNode = el.div(
+        null,
+        // Deposit/Withdraw popup buttons
+        el.div(
+          {className: 'btn-group navbar-left btn-group-xs'},
+          el.button(
+            {
+              type: 'button',
+              className: 'btn navbar-btn btn-xs ' + (betStore.state.wager.error === 'CANNOT_AFFORD_WAGER' ? 'btn-success' : 'btn-default'),
+              onClick: this._openDepositPopup
+            },
+            'Deposit'
+          ),
+          el.button(
+            {
+              type: 'button',
+              className: 'btn btn-default navbar-btn btn-xs',
+              onClick: this._openWithdrawPopup
+            },
+            'Withdraw'
+          )
+        ),
+        // Balance
+        el.span(
+          {
+            className: 'navbar-text',
+            style: {marginRight: '5px'}
+          },
+          (worldStore.state.user.balance / 100) + ' bits',
+          !worldStore.state.user.unconfirmed_balance ?
+           '' :
+           el.span(
+             {style: { color: '#e67e22'}},
+             ' + ' + (worldStore.state.user.unconfirmed_balance / 100) + ' bits pending'
+           )
+        ),
+        // Refresh button
+        el.button(
+          {
+            className: 'btn btn-link navbar-btn navbar-left ' + (worldStore.state.isRefreshingUser ? ' rotate' : ''),
+            title: 'Refresh Balance',
+            disabled: worldStore.state.isRefreshingUser,
+            onClick: this._onRefreshUser,
+            style: {
+              paddingLeft: 0,
+              paddingRight: 0,
+              marginRight: '10px'
+            }
+          },
+          el.span({className: 'glyphicon glyphicon-refresh'})
+        ),
+        // Logged in as...
+        el.span(
+          {className: 'navbar-text'},
+          'Logged in as ',
+          el.code(null, worldStore.state.user.uname)
+        ),
+        // Logout button
+        el.button(
+          {
+            type: 'button',
+            onClick: this._onLogout,
+            className: 'navbar-btn btn btn-default'
+          },
+          'Logout'
+        )
+      );
     } else {
-		innerNode = 
-		el.div({className: 'row'},
-			el.div({className: 'col-lg-4 col-md-4 col-sm-0 col-xs-0'}),
-			el.div({className: 'col-lg-4 col-md-4 col-sm-6 col-xs-6'},
-				el.div(null,
-					el.a({
-						href: config.mp_browser_uri + '/apps/' + config.app_id,
-						target: '_blank',
-						className: 'blue'
-						},
-						// External site glyphicon
-						el.span({className: 'glyphicon glyphicon-new-window'}
-						),
-						el.span(null,
-							
-							'View on Moneypot'
-						)
-					)
-				)
-			),
       // User needs to login
-			el.div({className: 'col-lg-4 col-md-4 col-sm-6 col-xs-6'},
-				el.div(null,
-					el.a({
-						href: config.mp_browser_uri + '/oauth/authorize' +
-							'?app_id=' + config.app_id +
-							'&redirect_uri=' + config.redirect_uri,
-						className: 'blue'
-						},
-						// External site glyphicon
-						el.span({className: 'glyphicon glyphicon-new-window'}
-						),
-						el.span(null,
-							'Login with Moneypot'
-						)
-					)
-				)
-			)
-		)
+      innerNode = el.p(
+        {className: 'navbar-text'},
+        el.a(
+          {
+            href: config.mp_browser_uri + '/oauth/authorize' +
+              '?app_id=' + config.app_id +
+              '&redirect_uri=' + config.redirect_uri,
+            className: 'btn btn-default'
+          },
+          'Login with Moneypot'
+        )
+      );
     }
 
-    return innerNode;
+    return el.div(
+      {className: 'navbar-right'},
+      innerNode
+    );
   }
 });
-
 
 var Navbar = React.createClass({
   displayName: 'Navbar',
   render: function() {
-    return el.div({className: 'row'},
-		el.div({className: 'col-lg-3 col-md-3 col-sm-12 col-xs-12'},
-			el.div(null,
-				el.img({className:"img-responsive", src: "img/sharpdice.png"}
-				)
-			)
-		),
-		
-		el.div({className: 'col-lg-9 col-md-9 col-sm-12 col-xs-12'},
-			el.div({id: 'containerHeader'},
-				// Userbox
-				React.createElement(UserBox, null)
-			)
-		)
-	
-	);
-
+    return el.div(
+      {className: 'navbar'},
+      el.div(
+        {className: 'container-fluid'},
+        el.div(
+          {className: 'navbar-header'},
+          el.a({className: 'navbar-brand', href:'/'}, config.app_name)
+        ),
+        // Links
+        el.ul(
+          {className: 'nav navbar-nav'},
+          el.li(
+            null,
+            el.a(
+              {
+                href: config.mp_browser_uri + '/apps/' + config.app_id,
+                target: '_blank'
+              },
+              'View on Moneypot ',
+              // External site glyphicon
+              el.span(
+                {className: 'glyphicon glyphicon-new-window'}
+              )
+            )
+          )
+        ),
+        // Userbox
+        React.createElement(UserBox, null)
+      )
+    );
   }
 });
 
@@ -1115,45 +1011,86 @@ var ChatBoxInput = React.createClass({
     }
   },
   render: function() {
-  return (	el.ul({className:'row'},
-			el.li({className:'col-lg-9 col-md-9 col-sm-9 col-xs-9'},
-				chatStore.state.loadingInitialMessages ?
-					el.div({
-							style: {marginTop: '7px'},
-							className: 'text-muted'
-					},
-					el.span({className: 'glyphicon glyphicon-refresh rotate'}),
-						' Loading...'
-					)
-				:
-				el.input({
-						type:'text',
-						className:'chatText',
-						value: this.state.text,
-						placeholder: worldStore.state.user ?
-							'Click here and begin typing...' :
-							'Login to chat',
-						onChange: this._onChange,
-						onKeyPress: this._onKeyPress,
-						onFocus: this._onFocus,
-						ref: 'input',
-						// TODO: disable while fetching messages
-						disabled: !worldStore.state.user || chatStore.state.loadingInitialMessages
-				})
-				
-			),
-			el.li({className:'col-lg-3 col-md-3 col-sm-3 col-xs-3'},
-				el.input({
-						type:'button',
-						value:'send',
-						className:'blue',
-						disabled: !worldStore.state.user ||
-						chatStore.state.waitingForServer ||
-						this.state.text.trim().length === 0,
-						onClick: this._onSend
-				})
-			)
-		)
+    return (
+      el.div(
+        {className: 'row'},
+        el.div(
+          {className: 'col-md-9'},
+          chatStore.state.loadingInitialMessages ?
+            el.div(
+              {
+                style: {marginTop: '7px'},
+                className: 'text-muted'
+              },
+              el.span(
+                {className: 'glyphicon glyphicon-refresh rotate'}
+              ),
+              ' Loading...'
+            )
+          :
+            el.input(
+              {
+                id: 'chat-input',
+                className: 'form-control',
+                type: 'text',
+                value: this.state.text,
+                placeholder: worldStore.state.user ?
+                  'Click here and begin typing...' :
+                  'Login to chat',
+                onChange: this._onChange,
+                onKeyPress: this._onKeyPress,
+                onFocus: this._onFocus,
+                ref: 'input',
+                // TODO: disable while fetching messages
+                disabled: !worldStore.state.user || chatStore.state.loadingInitialMessages
+              }
+            )
+        ),
+        el.div(
+          {className: 'col-md-3'},
+          el.button(
+            {
+              type: 'button',
+              className: 'btn btn-default btn-block',
+              disabled: !worldStore.state.user ||
+                chatStore.state.waitingForServer ||
+                this.state.text.trim().length === 0,
+              onClick: this._onSend
+            },
+            'Send'
+          )
+        )
+      )
+    );
+  }
+});
+
+var ChatUserList = React.createClass({
+  displayName: 'ChatUserList',
+  render: function() {
+    return (
+      el.div(
+        {className: 'panel panel-default cul'},
+        el.div(
+          {className: 'panel-heading'},
+          'UserList'
+        ),
+        el.div(
+          {className: 'panel-body'},
+          el.ul(
+            {},
+            _.values(chatStore.state.userList).map(function(u) {
+              return el.li(
+                {
+                  key: u.uname
+                },
+                helpers.roleToLabelElement(u.role),
+                ' ' + u.uname
+              );
+            })
+          )
+        )
+      )
     );
   }
 });
@@ -1194,184 +1131,84 @@ var ChatBox = React.createClass({
     chatStore.off('new_message', this._onNewMessage);
     chatStore.off('init', this._scrollChat);
   },
-  componentDidUpdate: function(){
-      $('.comment').emoticonize({
-				//delay: 800,
-				animate: false
-				//exclude: 'pre, code, .no-emoticons'
-			});
-  },
   //
   _onUserListToggle: function() {
     Dispatcher.sendAction('TOGGLE_CHAT_USERLIST');
   },
-  _showChatUserList: function(){
-    Dispatcher.sendAction('TOGGLE_CHAT_USERLIST');
-  },
   render: function() {
-      var userConected = el.div({className:"showUserList"},
-            // After the chatbox panel
-            el.p( null,
-                'Users online: ' + Object.keys(chatStore.state.userList).length + ' '
-                ),// Show/Hide userlist button
-                el.input({
-                    type: 'button',
-                    className: 'blue',
-                    value: 'show',
-                    style: {width:'45%'},
-                    onClick: this._onUserListToggle
-                    })
-                    
-                // Show userlist
-                
-            );
-      
-      
-	return el.div({className:'backgroundBlock'},
-		el.ul({className:'row'},
-			el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-				el.div({className:'chatContainer'},
-					el.ul({className: 'chat-list list-unstyled', ref: 'chatListRef'},
-						chatStore.state.messages.toArray().map(function(m) {
-							return el.li({// Use message id as unique key 
-											key: m.id
-										},
-										el.span({style: {fontFamily: 'monospace'}},
-                                            helpers.formatDateToTime(m.created_at),
-                                             ' '
-                                        ),
-										helpers.roleToLabelElement(m.user.role),
-										' ',
-										el.code(null, m.user.uname + ':'),
-										el.span({className: 'comment'}, ' ' + m.text)
-							);
-						})
-					)
-				)
-			),
-			el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-				React.createElement(ChatBoxInput, null)
-			)
-		),
-		worldStore.state.user ? userConected : ''
-		
-            
-	);
+    return el.div(
+      {id: 'chat-box'},
+      el.div(
+        {className: 'panel panel-default mcb'},
+        el.div(
+          {className: 'panel-body'},
+          el.ul(
+            {className: 'chat-list list-unstyled', ref: 'chatListRef'},
+            chatStore.state.messages.toArray().map(function(m) {
+              return el.li(
+                {
+                  // Use message id as unique key
+                  key: m.id
+                },
+                el.span(
+                  {
+                    style: {
+                      fontFamily: 'monospace'
+                    }
+                  },
+                  helpers.formatDateToTime(m.created_at),
+                  ' '
+                ),
+                m.user ? helpers.roleToLabelElement(m.user.role) : '',
+                m.user ? ' ' : '',
+                el.code(
+                  null,
+                  m.user ?
+                    // If chat message:
+                    m.user.uname :
+                    // If system message:
+                    'SYSTEM :: ' + m.text
+                ),
+                m.user ?
+                  // If chat message
+                  el.span(null, ' ' + m.text) :
+                  // If system message
+                  ''
+              );
+            })
+          )
+        ),
+        el.div(
+          {className: 'panel-footer'},
+          React.createElement(ChatBoxInput, null)
+        )
+      ),
+      // After the chatbox panel
+      el.p(
+        {
+          className: 'text-right text-muted',
+          style: { marginTop: '-15px' }
+        },
+        'Users online: ' + Object.keys(chatStore.state.userList).length + ' ',
+        // Show/Hide userlist button
+        el.button(
+          {
+            className: 'btn btn-default btn-xs',
+            onClick: this._onUserListToggle
+          },
+          chatStore.state.showUserList ? 'Hide' : 'Show'
+        )
+      ),
+      // Show userlist
+      chatStore.state.showUserList ? React.createElement(ChatUserList, null) : ''
+    );
   }
-});
-
-var ChatUserList = React.createClass({
-  displayName: 'ChatUserList',
-  _disableModal :function(){
-      Dispatcher.sendAction('TOGGLE_CHAT_USERLIST');
-  },
-    render: function() {
-        return (
-            el.div({className:'modalUserList'},
-                el.div({className: 'modalBk', onClick:this._disableModal}
-                ),
-                el.div({className: 'modalCntnt'},
-                    el.div(null,
-                        el.h4(null,'ONLINE USERS'),
-                        el.h5(null,el.br(null)),
-                        el.div({className: 'panel-heading'},
-                            el.ul(
-                                {},
-                                _.values(chatStore.state.userList).map(function(u) {
-                                    return el.li(
-                                        {
-                                            key: u.uname
-                                        },
-                                        helpers.roleToLabelElement(u.role),
-                                        ' ',
-										el.code(null, u.uname)
-                                    );
-                                })
-                            )
-                        )
-                    )
-                )
-                
-            )
-        );
-    }
-});
-
-var NextHashPopup = React.createClass({
-  displayName: 'NextHashPopup',
-  _onChangeHash: function(){
-    MoneyPot.generateBetHash({
-        success: function(data) {
-          Dispatcher.sendAction('SET_NEXT_HASH', data.hash);
-        }  
-    })  
-  },
-  _disableModal :function(){
-      Dispatcher.sendAction('TOGGLE_NEXT_HASH_POPUP');
-  },
-    render: function() {
-        return (
-            el.div({className:'modalHashSection'},
-                el.div({className: 'modalBk', onClick:this._disableModal}
-                ),
-                el.div({className: 'modalCntnt'},
-                    el.div(null,
-                        el.h4(null,'PROVABLY FAIR'),
-                        el.h5(null,el.br(null)),
-                        el.h4(null,'Why renew hash?'),
-                        el.p(null, "Renewing your hash affects the Salt and Client Seed values allowing you full control the client side of the final Provable fair calculation and outcome."),
-                        el.div(null,
-                            el.ul(null,
-                                el.h4(null,'Actual Hash'),
-                    			el.li(null,
-            				        el.div({id:'hashBox'},
-                				        betStore.state.nextHash
-                				    )
-                        		),
-                        		el.li(null,
-                        		    el.div(null,
-                            		    el.a({
-                        						type:'button',
-                        						className:'dps-drw col-lg-5 col-md-5 col-xs-5 col-sm-5',
-                        						disabled: true,
-                        						href:'#',
-                        						onClick: this._onChangeHash
-                        				    },'Renew Hash'
-                        				)
-                        		    ),
-                        		    el.div(null,
-                        				el.div({
-                        						className:'col-lg-2 col-md-2 col-xs-2 col-sm-2'
-                            				}
-                                		)
-                        			),
-                                    el.div(null,
-                        				el.a({
-                        						type:'button',
-                        						className:'dps-drw col-lg-5 col-md-5 col-xs-5 col-sm-5',
-                        						disabled: true,
-                        						href:'#',
-                        						onClick: this._disableModal
-                            				},
-                        				        'Close'
-                                		)
-                        			)
-                        		)
-                            )
-                        )
-                    )
-                )
-                
-            )
-        );
-    }
 });
 
 var BetBoxChance = React.createClass({
   displayName: 'BetBoxChance',
   // Hookup to stores
   _onStoreChange: function() {
-    helpers.calcHouseEdge();
     this.forceUpdate();
   },
   componentDidMount: function() {
@@ -1387,39 +1224,32 @@ var BetBoxChance = React.createClass({
     // 0.00 to 1.00
     var winProb = helpers.multiplierToWinProb(betStore.state.multiplier.num);
 
-    var isError = betStore.state.multiplier.error || betStore.state.wager.error || !(worldStore.state.user);
+    var isError = betStore.state.multiplier.error || betStore.state.wager.error;
 
     // Just show '--' if chance can't be calculated
     var innerNode;
     if (isError) {
-		innerNode =	el.input({
-						className: 'profit', 
-						disabled:'true',
-						value: '--'}
-					);
-    } 
-	else {
-		innerNode = el.input({
-						className: 'profit', 
-						disabled:'true',
-						value: (helpers.roundDown(winProb, 4) * 100).toFixed(2).toString() + '%'}
-					);
-	}
+      innerNode = el.span(
+        {className: 'lead'},
+        ' --'
+      );
+    } else {
+      innerNode = el.span(
+        {className: 'lead'},
+        ' ' + (winProb * 100).toFixed(2).toString() + '%'
+      );
+    }
 
-    return el.ul(null,
-		el.li(null,
-			el.div({className:'contenedor'},
-				el.label({className:'chanceLabel'},
-					"chance"
-				),
-				innerNode
-			)
-		)
-				 
-	);
+    return el.div(
+      {},
+      el.span(
+        {className: 'lead', style: { fontWeight: 'bold' }},
+        'Chance:'
+      ),
+      innerNode
+    );
   }
 });
-
 
 var BetBoxProfit = React.createClass({
   displayName: 'BetBoxProfit',
@@ -1441,32 +1271,28 @@ var BetBoxProfit = React.createClass({
 
     var innerNode;
     if (betStore.state.multiplier.error || betStore.state.wager.error) {
-		innerNode =	el.input({
-						className: 'profit', 
-						disabled:'true',
-						value: '--'}
-					);
-    } 
-	else {
-		innerNode = el.input({
-						className: 'profit', 
-						style: { color: '#39b54a' },
-						disabled:'true',
-						value: '+' + profit.toFixed(2)}
-					);
-	}
-	
-    return el.ul(null,
-		el.li(null,
-			el.div({className:'contenedor'},
-				el.label({className:'chanceLabel'},
-					"profits"
-				),
-				innerNode
-			)
-		)
-				 
-	);
+      innerNode = el.span(
+        {className: 'lead'},
+        '--'
+      );
+    } else {
+      innerNode = el.span(
+        {
+          className: 'lead',
+          style: { color: '#39b54a' }
+        },
+        '+' + profit.toFixed(2)
+      );
+    }
+
+    return el.div(
+      null,
+      el.span(
+        {className: 'lead', style: { fontWeight: 'bold' }},
+        'Profit: '
+      ),
+      innerNode
+    );
   }
 });
 
@@ -1524,29 +1350,143 @@ var BetBoxMultiplier = React.createClass({
     this._validateMultiplier(str);
   },
   render: function() {
+    return el.div(
+      {className: 'form-group'},
+      el.p(
+        {className: 'lead'},
+        el.strong(
+          {
+            style: betStore.state.multiplier.error ? { color: 'red' } : {}
+          },
+          'Multiplier:')
+      ),
+      el.div(
+        {className: 'input-group'},
+        el.input(
+          {
+            type: 'text',
+            value: betStore.state.multiplier.str,
+            className: 'form-control input-lg',
+            onChange: this._onMultiplierChange,
+            disabled: !!worldStore.state.isLoading
+          }
+        ),
+        el.span(
+          {className: 'input-group-addon'},
+          'x'
+        )
+      )
+    );
+  }
+});
 
-  return el.div({className: 'boxCoin'},
-		el.h3(null,"MULTIPLIER"),
-		el.fieldset(null,
-			el.ul(null,
-				el.li(null,
-					el.div({className:'centerContainer'},
-						el.div({className:'buttonCoinCenter'},
-							el.input(
-								{
-									type: 'text',
-									value: betStore.state.multiplier.str,
-									className: 'inputCoin',
-									onChange: this._onMultiplierChange,
-									disabled: !!worldStore.state.isLoading
-								}
-							),
-							el.label({className:'inputCoinLabel'}, "X")
-						)
-					)
-				)
-			)
-		)
+var BetBoxWager = React.createClass({
+  displayName: 'BetBoxWager',
+  // Hookup to stores
+  _onStoreChange: function() {
+    this.forceUpdate();
+  },
+  _onBalanceChange: function() {
+    // Force validation when user logs in
+    // TODO: Re-force it when user refreshes
+    Dispatcher.sendAction('UPDATE_WAGER', {});
+  },
+  componentDidMount: function() {
+    betStore.on('change', this._onStoreChange);
+    worldStore.on('change', this._onStoreChange);
+    worldStore.on('user_update', this._onBalanceChange);
+  },
+  componentWillUnmount: function() {
+    betStore.off('change', this._onStoreChange);
+    worldStore.off('change', this._onStoreChange);
+    worldStore.off('user_update', this._onBalanceChange);
+  },
+  _onWagerChange: function(e) {
+    var str = e.target.value;
+    Dispatcher.sendAction('UPDATE_WAGER', { str: str });
+  },
+  _onHalveWager: function() {
+    var newWager = Math.round(betStore.state.wager.num / 2);
+    Dispatcher.sendAction('UPDATE_WAGER', { str: newWager.toString() });
+  },
+  _onDoubleWager: function() {
+    var n = betStore.state.wager.num * 2;
+    Dispatcher.sendAction('UPDATE_WAGER', { str: n.toString() });
+
+  },
+  _onMaxWager: function() {
+    // If user is logged in, use their balance as max wager
+    var balanceBits;
+    if (worldStore.state.user) {
+      balanceBits = Math.floor(worldStore.state.user.balance / 100);
+    } else {
+      balanceBits = 42000;
+    }
+    Dispatcher.sendAction('UPDATE_WAGER', { str: balanceBits.toString() });
+  },
+  //
+  render: function() {
+    var style1 = { borderBottomLeftRadius: '0', borderBottomRightRadius: '0' };
+    var style2 = { borderTopLeftRadius: '0' };
+    var style3 = { borderTopRightRadius: '0' };
+    return el.div(
+      {className: 'form-group'},
+      el.p(
+        {className: 'lead'},
+        el.strong(
+          // If wagerError, make the label red
+          betStore.state.wager.error ? { style: {color: 'red'} } : null,
+          'Wager:')
+      ),
+      el.input(
+        {
+          value: betStore.state.wager.str,
+          type: 'text',
+          className: 'form-control input-lg',
+          style: style1,
+          onChange: this._onWagerChange,
+          disabled: !!worldStore.state.isLoading,
+          placeholder: 'Bits'
+        }
+      ),
+      el.div(
+        {className: 'btn-group btn-group-justified'},
+        el.div(
+          {className: 'btn-group'},
+          el.button(
+            {
+              className: 'btn btn-default btn-md',
+              type: 'button',
+              style: style2,
+              onClick: this._onHalveWager
+            },
+            '1/2x ', worldStore.state.hotkeysEnabled ? el.kbd(null, 'X') : ''
+          )
+        ),
+        el.div(
+          {className: 'btn-group'},
+          el.button(
+            {
+              className: 'btn btn-default btn-md',
+              type: 'button',
+              onClick: this._onDoubleWager
+            },
+            '2x ', worldStore.state.hotkeysEnabled ? el.kbd(null, 'C') : ''
+          )
+        ),
+        el.div(
+          {className: 'btn-group'},
+          el.button(
+            {
+              className: 'btn btn-default btn-md',
+              type: 'button',
+              style: style3,
+              onClick: this._onMaxWager
+            },
+            'Max'
+          )
+        )
+      )
     );
   }
 });
@@ -1570,21 +1510,389 @@ var BetBoxButton = React.createClass({
   // cond is '>' or '<'
   _makeBetHandler: function(cond) {
     var self = this;
-    
+
     console.assert(cond === '<' || cond === '>');
 
     return function(e) {
-        
-            
+      console.log('Placing bet...');
+
+      // Indicate that we are waiting for server response
+      self.setState({ waitingForServer: true });
+
+      var hash = betStore.state.nextHash;
+      console.assert(typeof hash === 'string');
+
+      var wagerSatoshis = betStore.state.wager.num * 100;
+      var multiplier = betStore.state.multiplier.num;
+      var payoutSatoshis = wagerSatoshis * multiplier;
+
+      var number = helpers.calcNumber(
+        cond, helpers.multiplierToWinProb(multiplier)
+      );
+
+      var params = {
+        wager: wagerSatoshis,
+        client_seed: 0, // TODO
+        hash: hash,
+        cond: cond,
+        target: number,
+        payout: payoutSatoshis
+      };
+
+      MoneyPot.placeSimpleDiceBet(params, {
+        success: function(bet) {
+          console.log('Successfully placed bet:', bet);
+          // Append to bet list
+
+          // We don't get this info from the API, so assoc it for our use
+          bet.meta = {
+            cond: cond,
+            number: number,
+            hash: hash,
+            isFair: CryptoJS.SHA256(bet.secret + '|' + bet.salt).toString() === hash
+          };
+
+          // Sync up with the bets we get from socket
+          bet.wager = wagerSatoshis;
+          bet.uname = worldStore.state.user.uname;
+
+          Dispatcher.sendAction('NEW_BET', bet);
+
+          // Update next bet hash
+          Dispatcher.sendAction('SET_NEXT_HASH', bet.next_hash);
+
+          // Update user balance
+          Dispatcher.sendAction('UPDATE_USER', {
+            balance: worldStore.state.user.balance + bet.profit
+          });
+        },
+        error: function(xhr) {
+          console.log('Error');
+          if (xhr.responseJSON && xhr.responseJSON) {
+            alert(xhr.responseJSON.error);
+          } else {
+            alert('Internal Error');
+          }
+        },
+        complete: function() {
+          self.setState({ waitingForServer: false });
+          // Force re-validation of wager
+          Dispatcher.sendAction('UPDATE_WAGER', {
+            str: betStore.state.wager.str
+          });
+        }
+      });
+    };
+  },
+  render: function() {
+    var innerNode;
+
+    // TODO: Create error prop for each input
+    var error = betStore.state.wager.error || betStore.state.multiplier.error;
+
+    if (worldStore.state.isLoading) {
+      // If app is loading, then just disable button until state change
+      innerNode = el.button(
+        {type: 'button', disabled: true, className: 'btn btn-lg btn-block btn-default'},
+        'Loading...'
+      );
+    } else if (error) {
+      // If there's a betbox error, then render button in error state
+
+      var errorTranslations = {
+        'CANNOT_AFFORD_WAGER': 'You cannot afford wager',
+        'INVALID_WAGER': 'Invalid wager',
+        'INVALID_MULTIPLIER': 'Invalid multiplier',
+        'MULTIPLIER_TOO_PRECISE': 'Multiplier too precise',
+        'MULTIPLIER_TOO_HIGH': 'Multiplier too high',
+        'MULTIPLIER_TOO_LOW': 'Multiplier too low'
+      };
+
+      innerNode = el.button(
+        {type: 'button',
+         disabled: true,
+         className: 'btn btn-lg btn-block btn-danger'},
+        errorTranslations[error] || 'Invalid bet'
+      );
+    } else if (worldStore.state.user) {
+      // If user is logged in, let them submit bet
+      innerNode =
+        el.div(
+          {className: 'row'},
+          // bet hi
+          el.div(
+            {className: 'col-xs-6'},
+            el.button(
+              {
+                id: 'bet-hi',
+                type: 'button',
+                className: 'btn btn-lg btn-primary btn-block',
+                onClick: this._makeBetHandler('>'),
+                disabled: !!this.state.waitingForServer
+              },
+              'Bet Hi ', worldStore.state.hotkeysEnabled ? el.kbd(null, 'H') : ''
+            )
+          ),
+          // bet lo
+          el.div(
+            {className: 'col-xs-6'},
+            el.button(
+              {
+                id: 'bet-lo',
+                type: 'button',
+                className: 'btn btn-lg btn-primary btn-block',
+                onClick: this._makeBetHandler('<'),
+                disabled: !!this.state.waitingForServer
+              },
+              'Bet Lo ', worldStore.state.hotkeysEnabled ? el.kbd(null, 'L') : ''
+            )
+          )
+        );
+    } else {
+      // If user isn't logged in, give them link to /oauth/authorize
+      innerNode = el.a(
+        {
+          href: config.mp_browser_uri + '/oauth/authorize' +
+            '?app_id=' + config.app_id +
+            '&redirect_uri=' + config.redirect_uri,
+          className: 'btn btn-lg btn-block btn-success'
+        },
+        'Login with MoneyPot'
+      );
+    }
+
+    return el.div(
+      null,
+      el.div(
+        {className: 'col-md-2',},
+        (this.state.waitingForServer) ?
+          el.span(
+            {
+              className: 'glyphicon glyphicon-refresh rotate',
+              style: { marginTop: '15px' }
+            }
+          ) : ''
+      ),
+      el.div(
+        {className: 'col-md-8'},
+        innerNode
+      )
+    );
+  }
+});
+
+var HotkeyToggle = React.createClass({
+  displayName: 'HotkeyToggle',
+  _onClick: function() {
+    Dispatcher.sendAction('TOGGLE_HOTKEYS');
+  },
+  render: function() {
+    return (
+      el.div(
+        {className: 'text-center'},
+        el.button(
+          {
+            type: 'button',
+            className: 'btn btn-default btn-sm',
+            onClick: this._onClick,
+            style: { marginTop: '-15px' }
+          },
+          'Hotkeys: ',
+          worldStore.state.hotkeysEnabled ?
+            el.span({className: 'label label-success'}, 'ON') :
+          el.span({className: 'label label-default'}, 'OFF')
+        )
+      )
+    );
+  }
+});
+
+var BetBox = React.createClass({
+  displayName: 'BetBox',
+  _onStoreChange: function() {
+    this.forceUpdate();
+  },
+  componentDidMount: function() {
+    worldStore.on('change', this._onStoreChange);
+  },
+  componentWillUnmount: function() {
+    worldStore.off('change', this._onStoreChange);
+  },
+  render: function() {
+    return el.div(
+      null,
+      el.div(
+        {className: 'panel panel-default mbb'},
+        el.div(
+          {className: 'panel-body'},
+          el.div(
+            {className: 'row'},
+            el.div(
+              {className: 'col-xs-6'},
+              React.createElement(BetBoxWager, null)
+            ),
+            el.div(
+              {className: 'col-xs-6'},
+              React.createElement(BetBoxMultiplier, null)
+            ),
+            // HR
+            el.div(
+              {className: 'row'},
+              el.div(
+                {className: 'col-xs-12'},
+                el.hr(null)
+              )
+            ),
+            // Bet info bar
+            el.div(
+              null,
+              el.div(
+                {className: 'col-sm-6'},
+                React.createElement(BetBoxProfit, null)
+              ),
+              el.div(
+                {className: 'col-sm-6'},
+                React.createElement(BetBoxChance, null)
+              )
+            ),
+            //Autobet
+            el.div(
+              {className:'row'},
+              el.div(
+                {className: 'col-xs-12'},
+                React.createElement(ToggleAutomaticRoll1, null)
+              )
+            ),
+            el.div(
+              {className: 'row', id:'automaticBet'},
+              el.div(
+                {className: 'col-xs-12'},
+                betStore.state.showAutomaticRoll ? React.createElement(ToggleAutomaticRoll, null) : ''
+              )
+            )
+          )
+        ),
+        el.div(
+          {className: 'panel-footer clearfix'},
+          React.createElement(BetBoxButton, null)
+        )
+      ),
+      React.createElement(HotkeyToggle, null)
+    );
+  }
+});
+
+var ToggleAutomaticRoll1 = React.createClass({
+  displayName: 'ToggleAutomaticRoll',
+    getInitialState: function() {
+        return { waitingForServer: false };
+    },
+  
+    _onStoreChange: function() {
+        this.forceUpdate();
+    },
+    componentDidMount: function() {
+        worldStore.on('change', this._onStoreChange);
+    },
+    componentWillUnmount: function() {
+        worldStore.off('change', this._onStoreChange);
+    },
+  _displayAutomatic: function(){
+        Dispatcher.sendAction("TOGGLE_SHOW_AUTOMATIC_ROLL");
+        this.forceUpdate();
+  },
+  render: function() { 
+    return  el.div(null,
+                el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                    el.h5(null,el.span(null, "Automated Betting"))
+            ),
+                el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                    el.div({className:'buttonMoreCenter'},
+                        el.a(
+                              {
+                                    onClick: this._displayAutomatic,
+                                    className: 'btn buttonMore',
+                                    type: 'button',
+                                    id: 'displayAutomatic'
+                              },
+                              !betStore.state.showAutomaticRoll ? '+' : '-'
+                            )
+                    )
+            )
+        );
+    }
+});
+
+var ToggleAutomaticRoll = React.createClass({
+  displayName: 'ToggleAutomaticRoll',
+    getInitialState: function() {
+        return { waitingForServer: false };
+    },
+    _onStoreChange: function() {
+        console.log("_onStoreChange");
+        this.forceUpdate();
+    },
+    componentDidMount: function() {
+        worldStore.on('change', this._onStoreChange);
+    },
+    componentWillUnmount: function() {
+        worldStore.off('change', this._onStoreChange);
+    },
+  _AutomaticToggle: function(){
+        Dispatcher.sendAction('AUTOMATIC_BET_WAGER_STATE');
+        this.forceUpdate();
+  },
+  _speedOfBet: function(e){
+      console.log(e.currentTarget.value);
+      Dispatcher.sendAction("SET_SPEED_OF_BETS", e.currentTarget.value);
+      this.forceUpdate();
+  },
+  _numberOfBet: function(e){
+      console.log(e.currentTarget.value);
+      Dispatcher.sendAction("SET_AUTOMATIC_NUMBER_OF_BETS", e.currentTarget.value);
+      this.forceUpdate();
+  },
+  _increaseOnLose: function(e){
+      Dispatcher.sendAction("SET_INCREASE_ON_LOSE", e.currentTarget.value);
+      this.forceUpdate();
+  },
+    _increaseOnWin: function(e){
+        Dispatcher.sendAction("SET_INCREASE_ON_WIN", e.currentTarget.value);
+        this.forceUpdate();
+  },
+  _stopRoll: function(){
+      Dispatcher.sendAction("STOP_ROLL");
+  },
+  _setMultiOnWin: function(e){
+      Dispatcher.sendAction("SET_MULTI_ON_WIN", e.currentTarget.value);
+  },
+  _setMultiOnLose: function(e){
+      Dispatcher.sendAction("SET_MULTI_ON_LOSE", e.currentTarget.value);
+  },
+  _newLimitNumberOfBet: function(e){
+      console.log(betStore.state.disableNumberOfBet + "nuevo limite");
+      var str = e.currentTarget.value;
+      Dispatcher.sendAction("UPDATE_NUMBER_OF_BETS_LIMIT", {str: str});
+      
+      this.forceUpdate();
+  },
+    _makeBetHandler: function(cond) {
+    var self = this;
+    
+    console.assert(cond === '<' || cond === '>');
+
+        return function(e) {
+                $('#wagerCoinState').attr('disabled','true');
+                Dispatcher.sendAction('AUTOMATE_TOGGLE_ROLL');
                 console.log('Placing bet...');
     
                 // Indicate that we are waiting for server response
                 self.setState({ waitingForServer: true });
-                
+                var profitBet;
                 var hash = betStore.state.nextHash;
                 console.assert(typeof hash === 'string');
                 
-                var wagerSatoshis = betStore.state.wager.num * 100;
+                var wagerSatoshis = betStore.state.profitGained.num * 100;
                 var multiplier = betStore.state.multiplier.num;
                 var payoutSatoshis = wagerSatoshis * multiplier;
                 
@@ -1600,18 +1908,12 @@ var BetBoxButton = React.createClass({
                     target: number,
                     payout: payoutSatoshis
                 };
-                
-                $('#imagenGif').attr('src',"img/dice.gif");
-                $('#numberRolled').attr('display','none');
-                $('#numberRolled').fadeOut(0);
-                
+
                 MoneyPot.placeSimpleDiceBet(params, {
                 success: function(bet) {
                   console.log('Successfully placed bet:', bet);
                   // Append to bet list
-                  console.log('Successfully placed bet:', bet.profit);
-                 
-                  $('#numberRolled').text(bet.outcome);
+                  profitBet = bet.profit;
                   // We don't get this info from the API, so assoc it for our use
                   bet.meta = {
                     cond: cond,
@@ -1640,164 +1942,350 @@ var BetBoxButton = React.createClass({
                   }
                 },
                 complete: function() {
-                    $('#numberRolled').attr('display','block');
-                    $('#numberRolled').delay(500).fadeIn(500);
                     setTimeout(function() {
-                        
                         self.setState({ waitingForServer: false });
-                   
+                        $('#wagerCoinState').attr('disabled',false);
                         // Force re-validation of wager
                         Dispatcher.sendAction('UPDATE_WAGER', {
                             str: betStore.state.wager.str
                         });
-                    }.bind(this), 1000);
-                    
+                        if(betStore.state.automaticToggle){
+                           
+                                if(profitBet > 0){
+                                    if(betStore.state.increaseOnWin == "true"){
+                                        Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.multiOnWin);
+                                    }else{
+                                        Dispatcher.sendAction('RETURN_BASE_BET');
+                                    }
+                                }else{
+                                    if(betStore.state.increaseOnLose == "true"){
+                                        Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.multiOnLose);
+                                    }else{
+                                        Dispatcher.sendAction('RETURN_BASE_BET');
+                                    }
+                                }
+                                if(betStore.state.automaticToggle){
+                                    
+                                        if(cond === '<'){
+                                            $('#automateBet-lo')[0].click();
+                                        }else if(cond === '>') {
+                                            $('#automateBet-hi')[0].click();
+                                        }
+                                    
+                                }
+                          
+                            
+                        }
+                    }.bind(this), betStore.state.betVelocity);
                     
                 }
                 });
            
-    };
-  },
-  render: function() {
-    var innerNode;
-
-    // TODO: Create error prop for each input
-    var error = betStore.state.wager.error || betStore.state.multiplier.error;
-	
-    if (worldStore.state.isLoading) {
-      // If app is loading, then just disable button until state change
-      innerNode = el.button(
-        {type: 'button', disabled: true, className: 'btn btn-lg btn-block btn-default'},
-        'Loading...'
-      );
-    } else if (error) {
-      // If there's a betbox error, then render button in error state
-
-      var errorTranslations = {
-        'CANNOT_AFFORD_WAGER': 'You cannot afford wager',
-        'INVALID_WAGER': 'Invalid wager',
-        'INVALID_MULTIPLIER': 'Invalid multiplier',
-        'MULTIPLIER_TOO_PRECISE': 'Multiplier too precise',
-        'MULTIPLIER_TOO_HIGH': 'Multiplier too high',
-        'MULTIPLIER_TOO_LOW': 'Multiplier too low'
-      };
-
-      innerNode = el.button(
-        {type: 'button',
-         disabled: true,
-         className: 'btn btn-lg btn-block btn-danger'},
-        errorTranslations[error] || 'Invalid bet'
-      );
-    } else if (worldStore.state.user) {
-      // If user is logged in, let them submit bet
-        var winProb = helpers.multiplierToWinProb(betStore.state.multiplier.num);
-        
-		innerNode = 
-			el.ul({className: 'row'},
-				el.li({className: 'col-lg-6 col-md-6 col-sm-6 col-xs-6'},
-					el.a(
-						{
-                        type:'button',
-						className: 'blue',
-						id: 'bet-hi',
-						onClick: this._makeBetHandler('>'),
-						disabled: !!this.state.waitingForServer
-						},
-						el.span(null,
-							el.span({className: 'bet-high'}
-							),
-							el.span({className: 'bets unselectable'},
-								"ROLL HIGH",
-								el.span({className: 'unselectable rateWin'}, '>'+helpers.calcNumber('>',winProb).toFixed(2))
-							),
-							el.span({className: 'betHotKey'},
-								worldStore.state.hotkeysEnabled ? el.kbd({className:'unselectable'}, 'H') : ''
-							)
-						)
-					)
-				),
-				el.li({className: 'col-lg-6 col-md-6 col-sm-6 col-xs-6'},
-					el.a(
-						{
-                        type:'button',
-						className: 'blue',
-						onClick: this._makeBetHandler('<'),
-						disabled: !!this.state.waitingForServer,
-						id: 'bet-lo'
-						},
-						el.span({className: 'bet-low'}
-						),
-						el.span({className: 'bets unselectable', style:{position:'relative'}},
-							"ROLL LOW",
-							el.span({className: 'unselectable rateWin'}, '<'+helpers.calcNumber('<',winProb).toFixed(2))
-						),
-						el.span({className: 'betHotKey'},
-							worldStore.state.hotkeysEnabled ? el.kbd({className:'unselectable'}, 'L') : ''
-						)
-					)	
-				)	
-			);
-    } else {
-      // If user isn't logged in, give them link to /oauth/authorize
-      innerNode = el.a(
-        {
-          href: config.mp_browser_uri + '/oauth/authorize' +
-            '?app_id=' + config.app_id +
-            '&redirect_uri=' + config.redirect_uri,
-          className: 'btn btn-lg btn-block btn-success'
-        },
-        'Login with MoneyPot'
-      );
-    }
-	//TODO: TERMINAR
-    return el.div(null,
-            (this.state.waitingForServer) ?
-            el.div({className: 'row', style:{position:'relative;'}},
-    			el.div({className: 'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-                    
-                        el.button(
-                            {
-                                className: ' btn btn-lg btn-block btn-danger',
-                                disabled: 'true'
-                            }, 
-                            el.span(
-                                {
-                                  className: 'glyphicon glyphicon-refresh rotate'
-                                }
-                            )
-                        )
-                )
-            ) : innerNode
+        };
+    },
+  render: function() { 
+          var winProb = helpers.multiplierToWinProb(betStore.state.multiplier.num);
+          var error = betStore.state.wager.error || betStore.state.multiplier.error;
+          var betHiLowNode
+            if (worldStore.state.isLoading) {
+              // If app is loading, then just disable button until state change
+                betHiLowNode = el.button(
+                    {type: 'button', disabled: true, className: 'btn btn-lg btn-block btn-default'},
+                    'Loading...'
+                );
+            } else if (error) {
+              // If there's a betbox error, then render button in error state
             
-    );
-  }
-});
-
-var HotkeyToggle = React.createClass({
-  displayName: 'HotkeyToggle',
-  _onClick: function() {
-    Dispatcher.sendAction('TOGGLE_HOTKEYS');
-  },
-  render: function() {
-    return (
-		el.ul(null,
-			el.li(null,
-				el.div({className:'contenedor'},
-					el.label({className:'chanceLabel'},
-						"Hotkeys"
-					),
-					el.a({
-								type:"button",
-								className:"profit btn btn-xs",
-								onClick: this._onClick
-							},
-							worldStore.state.hotkeysEnabled ? el.span({className:'buttonActive'},'ON'): 'OFF'
-					)
-				)
-			)
-		)
-    );
-  }
+              var errorTranslations = {
+                'CANNOT_AFFORD_WAGER': 'You cannot afford wager',
+                'INVALID_WAGER': 'Invalid wager',
+                'INVALID_MULTIPLIER': 'Invalid multiplier',
+                'MULTIPLIER_TOO_PRECISE': 'Multiplier too precise',
+                'MULTIPLIER_TOO_HIGH': 'Multiplier too high',
+                'MULTIPLIER_TOO_LOW': 'Multiplier too low'
+              };
+            
+              betHiLowNode = el.button(
+                {type: 'button',
+                 disabled: true,
+                 className: 'btn btn-lg btn-block btn-danger'},
+                errorTranslations[error] || 'Invalid bet'
+              );
+            } else if (worldStore.state.user) {
+                betHiLowNode =
+                el.ul({className:'row'},
+                    el.li({className: 'col-lg-6 col-md-6 col-sm-6 col-xs-6'},
+                    el.a(
+                      {
+                            type:'button',
+                      className: 'blue',
+                      id: 'automateBet-hi',
+                      onClick: this._makeBetHandler('>')
+                      },
+                      el.span({className: 'bets unselectable', style:{position:'relative'}},
+                        el.span(null,"AUTOMATE HIGH"),
+                        el.span({className: 'unselectable autoRateWin'}, '>'+helpers.calcNumber('>',winProb).toFixed(2))
+                      )
+                    )
+                  ),
+                  el.li({className: 'col-lg-6 col-md-6 col-sm-6 col-xs-6'},
+                    el.a(
+                      {
+                            type:'button',
+                      className: 'blue',
+                      id: 'automateBet-lo',
+                      onClick: this._makeBetHandler('<')
+                      },
+                      el.span({className: 'bets unselectable', style:{position:'relative'}},
+                        el.span(null,"AUTOMATE LOW"),
+                        el.span({className: 'unselectable autoRateWin'}, '<'+helpers.calcNumber('<',winProb).toFixed(2))
+                      )
+                    )
+                  )
+                );
+            }else {
+            // If user isn't logged in, give them link to /oauth/authorize
+                betHiLowNode = el.a(
+                {
+                  href: config.mp_browser_uri + '/oauth/authorize' +
+                    '?app_id=' + config.app_id +
+                    '&redirect_uri=' + config.redirect_uri,
+                  className: 'btn btn-lg btn-block btn-success'
+                },
+                'Login with MoneyPot'
+                );
+            }
+      var buttonStopNode = 
+              el.ul({className:'row'},
+              el.li({className: 'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                        
+                        el.input(
+                            {
+                                type: 'button',
+                                className: ' btn btn-lg btn-block btn-danger',
+                                value: 'STOP ROLL',
+                                onClick: this._stopRoll
+                            }
+                        )
+                    )
+                );
+      
+    return  el.div(null,
+                el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                    el.div({className:'automateBackground'},
+                            (this.state.waitingForServer) ? buttonStopNode : betHiLowNode
+                    )
+                  ),
+                  el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                      el.p(null, "Select your betting speed")
+                  ),
+                  el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                    el.div({className:'speedBackground'},
+                        el.ul({className:'row'},
+                            el.li({className:'col-lg-5 col-md-5 col-sm-6 col-xs-6'},
+                                el.input(
+                                    {
+                                            id: 'radioStyle',
+                                            name: 'speedOfBet',
+                                            type: 'radio',
+                                            defaultChecked: "checked",
+                                            onChange: this._speedOfBet,
+                                            value: 'false'
+                                    }
+                                    ),
+                                    el.label({className:'radioPureCSS1'},
+                                        el.span(null,
+                                            el.span(null)
+                                        ),
+                                        el.label(null, "Average")
+                                       
+                                    )
+                                ),
+                                el.li({className:'col-lg-7 col-md-7 col-sm-6 col-xs-6'},
+                                el.input(
+                                    {
+                                       id: 'radioStyle',
+                                       name: 'speedOfBet',
+                                       type: 'radio',
+                                       onChange: this._speedOfBet,
+                                       value: 'true'
+                                    }
+                                    ),
+                                    el.label({className:'radioPureCSS1'},
+                                        el.span(null,
+                                            el.span(null)
+                                        ),
+                                        el.label(null, "Sharp Speed!")
+                                    )
+                                )
+                            )
+                      )   
+                  ),
+                  el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                      el.p(null, "Limit number of Bets")
+                  ),
+                el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                    el.div({className:'automateBackground'},
+                        el.ul({className:'row'},
+                            el.li({className:'col-lg-5 col-md-5 col-sm-6 col-xs-6'},
+                                el.input(
+                                    {
+                                            id: 'radioStyle',
+                                            name: 'numberOfBet',
+                                            type: 'radio',
+                                            defaultChecked: "checked",
+                                            onChange: this._numberOfBet,
+                                            value: 'false'
+                                    }
+                                    ),
+                                    el.label({className:'radioPureCSS1'},
+                                        el.span(null,
+                                            el.span(null)
+                                        ),
+                                        el.label(null, "Unlimited")
+                                       
+                                    )
+                                ),
+                                el.li({className:'col-lg-7 col-md-7 col-sm-6 col-xs-6'},
+                                el.input(
+                                    {
+                                       id: 'radioStyle',
+                                       name: 'numberOfBet',
+                                       type: 'radio',
+                                       onChange: this._numberOfBet,
+                                       value: 'true'
+                                    }
+                                    ),
+                                    el.label({className:'radioPureCSS1'},
+                                        el.span(null,
+                                            el.span(null)
+                                        ),
+                                        el.label(null, "Amount")
+                                    ),
+                                    el.input(
+                                        {
+                                            type:'text',
+                                            className:'autoAmount',
+                                            value: betStore.state.NumberOfBetLimit.str,
+                                            onChange: this._newLimitNumberOfBet,
+                                            disabled: betStore.state.disableNumberOfBet
+                                        }
+                                    )
+                                )
+                            )
+                      )   
+                  ),
+                  el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                      el.p(null, "On Lose")
+                  ),
+                el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                    el.div({className:'automateBackground'},
+                        el.ul({className:'row'},
+                            el.li({className:'col-lg-5 col-md-5 col-sm-6 col-xs-6'},
+                                el.input(
+                                    {
+                                       id: 'radioStyle',
+                                       name: 'returnOnWin',
+                                       type: 'radio',
+                                       defaultChecked: "checked",
+                                       onChange: this._increaseOnLose,
+                                       value: false
+                                    }
+                                    ),
+                                    el.label({className:'radioPureCSS1'},
+                                        el.span(null,
+                                            el.span(null)
+                                        ),
+                                        el.label(null, "Return to Base")
+                                       
+                                    )
+                                ),
+                                el.li({className:'col-lg-7 col-md-7 col-sm-6 col-xs-6'},
+                                el.input(
+                                    {
+                                       id: 'radioStyle',
+                                       name: 'returnOnWin',
+                                       type: 'radio',
+                                       onChange: this._increaseOnLose,
+                                       value: true
+                                    }
+                                    ),
+                                    el.label({className:'radioPureCSS1'},
+                                        el.span(null,
+                                            el.span(null)
+                                        ),
+                                        el.label(null, "Increase Bet")
+                                    ),
+                                    el.label({className:'autoRollInputLabel'}, "x"),
+                                    el.input(
+                                        {
+                                            type:'text',
+                                            className:'returnAmount',
+                                            onChange: this._setMultiOnLose,
+                                            value: betStore.state.multiOnLose
+                                        }
+                                    )
+                                )
+                            )
+                      )   
+                  ),
+                  el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                      el.p(null, "On Win")
+                  ),
+                el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                    el.div({className:'automateBackground'},
+                        el.ul({className:'row'},
+                            el.li({className:'col-lg-5 col-md-5 col-sm-6 col-xs-6'},
+                                el.input(
+                                    {
+                                       id: 'radioStyle',
+                                       name: 'returnOnLose',
+                                       type: 'radio',
+                                       defaultChecked: "checked",
+                                       onChange: this._increaseOnWin,
+                                       value: false
+                                    }
+                                    ),
+                                    el.label({className:'radioPureCSS1'},
+                                        el.span(null,
+                                            el.span(null)
+                                        ),
+                                        el.label(null, "Return to Base")
+                                       
+                                    )
+                                ),
+                                el.li({className:'col-lg-7 col-md-7 col-sm-6 col-xs-6'},
+                                el.input(
+                                    {
+                                       id: 'radioStyle',
+                                       name: 'returnOnLose',
+                                       type: 'radio',
+                                       onChange: this._increaseOnWin,
+                                       value: true
+                                    }
+                                    ),
+                                    el.label({className:'radioPureCSS1'},
+                                        el.span(null,
+                                            el.span(null)
+                                        ),
+                                        el.label(null, "Increase Bet")
+                                    ),
+                                    el.label({className:'autoRollInputLabel'}, "x"),
+                                    el.input(
+                                        {
+                                            type:'text',
+                                            className:'returnAmount',
+                                            onChange: this._setMultiOnWin,
+                                            value: betStore.state.multiOnWin
+                                        }
+                                    )
+                                )
+                            )
+                      )   
+                  )
+          
+        );
+    }
 });
 
 var Tabs = React.createClass({
@@ -1818,44 +2306,44 @@ var Tabs = React.createClass({
     };
   },
   render: function() {
-	return el.div(null,
-		el.ul({className:'row'},
-			el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-				el.div({className: 'tab-content', id:'myTabContent'},
-					el.ul({className: 'nav nav-tabs'},
-						el.li({className: worldStore.state.currTab === 'MY_BETS' ? 'active' : ''},
-							el.a(
-								{
-									href: 'javascript:void(0)',
-									onClick: this._makeTabChangeHandler('MY_BETS')
-								},
-							'My Bets'
-							)
-						),
-						el.li({className: worldStore.state.currTab === 'ALL_BETS' ? 'active' : ''},
-							el.a(
-								{
-									href: 'javascript:void(0)',
-									onClick: this._makeTabChangeHandler('ALL_BETS')
-								},
-							'All Bets'
-							)
-						),
-						!config.recaptcha_sitekey ? '' : 
-							el.li({className: worldStore.state.currTab === 'FAUCET' ? 'active' : ''},
-							el.a(
-								{
-									href: 'javascript:void(0)',
-									onClick: this._makeTabChangeHandler('FAUCET')
-								},
-								el.span(null, 'Faucet ')
-							)
-						)
-					)
-				)
-			)
-		)
-	);
+    return el.ul(
+      {className: 'nav nav-tabs'},
+      el.li(
+        {className: worldStore.state.currTab === 'ALL_BETS' ? 'active' : ''},
+        el.a(
+          {
+            href: 'javascript:void(0)',
+            onClick: this._makeTabChangeHandler('ALL_BETS')
+          },
+          'All Bets'
+        )
+      ),
+      // Only show MY BETS tab if user is logged in
+      !worldStore.state.user ? '' :
+        el.li(
+          {className: worldStore.state.currTab === 'MY_BETS' ? 'active' : ''},
+          el.a(
+            {
+              href: 'javascript:void(0)',
+              onClick: this._makeTabChangeHandler('MY_BETS')
+            },
+            'My Bets'
+          )
+        ),
+      // Display faucet tab even to guests so that they're aware that
+      // this casino has one.
+      !config.recaptcha_sitekey ? '' :
+        el.li(
+          {className: worldStore.state.currTab === 'FAUCET' ? 'active' : ''},
+          el.a(
+            {
+              href: 'javascript:void(0)',
+              onClick: this._makeTabChangeHandler('FAUCET')
+            },
+            el.span(null, 'Faucet ')
+          )
+        )
+    );
   }
 });
 
@@ -1871,123 +2359,88 @@ var MyBetsTabContent = React.createClass({
     worldStore.off('change', this._onStoreChange);
   },
   render: function() {
-    return el.div({className:'backgroundBlock'},
-		el.ul({className:'row'},
-			el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12', id:'tabsContent'},
-				el.div({className:'tab-pane fade in active', id:'myBets'},
-					el.ul({className:'row'},
-						el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-							el.ul({className:'row'},
-								el.li({className:'col-lg-3 col-md-3 col-sm-3 col-xs-3'},
-									"ID"
-								),
-								el.li({className:'col-lg-3 col-md-3 col-sm-3 col-xs-3'},
-									"Profit"
-								),
-								el.li({className:'col-lg-3 col-md-3 col-sm-3 col-xs-3'},
-									'Outcome'
-								),
-								el.li({className:'col-lg-3 col-md-3 col-sm-3 col-xs-3'},
-									'Target'
-								)
-							)
-						)
-					),
-					el.ul({className:'row'},
-						worldStore.state.bets.toArray().map(function(bet) {
-							return el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12', key: bet.bet_id},
-								el.ul({className:'row'},
-									el.li({className:'col-lg-3 col-md-3 col-sm-3 col-xs-3'},
-										el.a(
-											{href: config.mp_browser_uri + '/bets/' + bet.bet_id},
-											bet.bet_id
-										)
-									),
-									el.li({className:'col-lg-3 col-md-3 col-sm-3 col-xs-3', style: {color: bet.profit > 0 ? 'green' : 'red'}},
-										bet.profit > 0 ? '+' + bet.profit/100 : bet.profit/100
-									),
-									el.li({className:'col-lg-3 col-md-3 col-sm-3 col-xs-3'},
-										bet.outcome + ' ', bet.meta.isFair ?
-											el.span(
-											{className: 'label label-success'}, 'Verified') : ''
-									),
-									el.li({className:'col-lg-3 col-md-3 col-sm-3 col-xs-3'},
-										 bet.meta.cond + ' ' + bet.meta.number.toFixed(2)
-									)
-								)
-							)
-						}).reverse()
-					)
-				)
-			)
-				
-		)
-    );
-  }
-});
-
-var MyAllBetsTabContent = React.createClass({
-  displayName: 'MyAllBetsTabContent',
-  _onStoreChange: function() {
-    this.forceUpdate();
-  },
-  componentDidMount: function() {
-    worldStore.on('change', this._onStoreChange);
-  },
-  componentWillUnmount: function() {
-    worldStore.off('change', this._onStoreChange);
-  },
-  render: function() {
-    return el.div({className:'backgroundBlock'},
-		el.ul({className:'row'},
-			el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12', id:'tabsContent'},
-				el.div({className:'tab-pane fade in active', id:'myBets'},
-					el.ul({className:'row'},
-						el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-							el.ul({className:'row'},
-								el.li({className:'col-lg-3 col-md-3 col-sm-3 col-xs-3'},
-									"ID"
-								),
-								el.li({className:'col-lg-3 col-md-3 col-sm-3 col-xs-3'},
-									"Profit"
-								),
-								el.li({className:'col-lg-3 col-md-3 col-sm-3 col-xs-3'},
-									'Player'
-								),
-								el.li({className:'col-lg-2 col-md-2 col-sm-2 col-xs-2'},
-									'Date'
-								)
-							)
-						)
-					),
-					el.ul({className:'row'},
-						worldStore.state.allBets.toArray().map(function(bet) {
-						    return el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12', key: bet.id},
-								el.ul({className:'row'},
-									el.li({className:'col-lg-3 col-md-3 col-sm-3 col-xs-3'},
-										el.a(
-											{href: config.mp_browser_uri + '/bets/' + bet.id},
-											bet.id
-										)
-									),
-									el.li({className:'col-lg-3 col-md-3 col-sm-3 col-xs-3', style: {color: bet.profit > 0 ? 'green' : 'red'}},
-										bet.profit > 0 ? '+' + bet.profit/100 : bet.profit/100
-									),
-									el.li({className:'col-lg-3 col-md-3 col-sm-3 col-xs-3'},
-										 bet.uname
-									),
-									el.li({className:'col-lg-3 col-md-3 col-sm-3 col-xs-3'},
-									     (bet.created_at).substr(0,10)
-									)
-								)
-							)
-							return el.span(null,bet.id )
-						})
-					)
-				)
-			)
-				
-		)
+    return el.div(
+      null,
+      el.table(
+        {className: 'table'},
+        el.thead(
+          null,
+          el.tr(
+            null,
+            el.th(null, 'ID'),
+            el.th(null, 'Time'),
+            el.th(null, 'User'),
+            el.th(null, 'Wager'),
+            el.th(null, 'Target'),
+            el.th(null, 'Roll'),
+            el.th(null, 'Profit')
+          )
+        ),
+        el.tbody(
+          null,
+          worldStore.state.bets.toArray().map(function(bet) {
+            return el.tr(
+              {
+                key: bet.bet_id || bet.id
+              },
+              // bet id
+              el.td(
+                null,
+                el.a(
+                  {
+                    href: config.mp_browser_uri + '/bets/' + (bet.bet_id || bet.id),
+                    target: '_blank'
+                  },
+                  bet.bet_id || bet.id
+                )
+              ),
+              // Time
+              el.td(
+                null,
+                helpers.formatDateToTime(bet.created_at)
+              ),
+              // User
+              el.td(
+                null,
+                el.a(
+                  {
+                    href: config.mp_browser_uri + '/users/' + bet.uname,
+                    target: '_blank'
+                  },
+                  bet.uname
+                )
+              ),
+              // wager
+              el.td(
+                null,
+                helpers.round10(bet.wager/100, -2),
+                ' bits'
+              ),
+              // target
+              el.td(
+                null,
+                bet.meta.cond + ' ' + bet.meta.number.toFixed(2)
+              ),
+              // roll
+              el.td(
+                null,
+                bet.outcome + ' ',
+                bet.meta.isFair ?
+                  el.span(
+                    {className: 'label label-success'}, 'Verified') : ''
+              ),
+              // profit
+              el.td(
+                {style: {color: bet.profit > 0 ? 'green' : 'red'}},
+                bet.profit > 0 ?
+                  '+' + helpers.round10(bet.profit/100, -2) :
+                  helpers.round10(bet.profit/100, -2),
+                ' bits'
+              )
+            );
+          }).reverse()
+        )
+      )
     );
   }
 });
@@ -2107,6 +2560,209 @@ var FaucetTabContent = React.createClass({
   }
 });
 
+// props: { bet: Bet }
+var BetRow = React.createClass({
+  displayName: 'BetRow',
+  render: function() {
+    var bet = this.props.bet;
+    return el.tr(
+      {},
+      // bet id
+      el.td(
+        null,
+        el.a(
+          {
+            href: config.mp_browser_uri + '/bets/' + (bet.bet_id || bet.id),
+            target: '_blank'
+          },
+          bet.bet_id || bet.id
+        )
+      ),
+      // Time
+      el.td(
+        null,
+        helpers.formatDateToTime(bet.created_at)
+      ),
+      // User
+      el.td(
+        null,
+        el.a(
+          {
+            href: config.mp_browser_uri + '/users/' + bet.uname,
+            target: '_blank'
+          },
+          bet.uname
+        )
+      ),
+      // Wager
+      el.td(
+        null,
+        helpers.round10(bet.wager/100, -2),
+        ' bits'
+      ),
+      // Target
+      el.td(
+        {
+          className: 'text-right',
+          style: {
+            fontFamily: 'monospace'
+          }
+        },
+        bet.cond + bet.target.toFixed(2)
+      ),
+      // // Roll
+      // el.td(
+      //   null,
+      //   bet.outcome
+      // ),
+      // Visual
+      el.td(
+        {
+          style: {
+            //position: 'relative'
+            fontFamily: 'monospace'
+          }
+        },
+        // progress bar container
+        el.div(
+          {
+            className: 'progress',
+            style: {
+              minWidth: '100px',
+              position: 'relative',
+              marginBottom: 0,
+              // make it thinner than default prog bar
+              height: '10px'
+            }
+          },
+          el.div(
+            {
+              className: 'progress-bar ' +
+                (bet.profit >= 0 ?
+                 'progress-bar-success' : 'progress-bar-grey') ,
+              style: {
+                float: bet.cond === '<' ? 'left' : 'right',
+                width: bet.cond === '<' ?
+                  bet.target.toString() + '%' :
+                  (100 - bet.target).toString() + '%'
+              }
+            }
+          ),
+          el.div(
+            {
+              style: {
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                width: bet.outcome.toString() + '%',
+                borderRight: '3px solid #333',
+                height: '100%'
+              }
+            }
+          )
+        ),
+        // arrow container
+        el.div(
+          {
+            style: {
+              position: 'relative',
+              width: '100%',
+              height: '15px'
+            }
+          },
+          // arrow
+          el.div(
+            {
+              style: {
+                position: 'absolute',
+                top: 0,
+                left: (bet.outcome - 1).toString() + '%'
+              }
+            },
+            el.div(
+              {
+                style: {
+                  width: '5em',
+                  marginLeft: '-10px'
+                }
+              },
+              // el.span(
+              //   //{className: 'glyphicon glyphicon-triangle-top'}
+              //   {className: 'glyphicon glyphicon-arrow-up'}
+              // ),
+              el.span(
+                {style: {fontFamily: 'monospace'}},
+                '' + bet.outcome
+              )
+            )
+          )
+        )
+      ),
+      // Profit
+      el.td(
+        {
+          style: {
+            color: bet.profit > 0 ? 'green' : 'red',
+            paddingLeft: '50px'
+          }
+        },
+        bet.profit > 0 ?
+          '+' + helpers.round10(bet.profit/100, -2) :
+          helpers.round10(bet.profit/100, -2),
+        ' bits'
+      )
+    );
+  }
+});
+
+var AllBetsTabContent = React.createClass({
+  displayName: 'AllBetsTabContent',
+  _onStoreChange: function() {
+    this.forceUpdate();
+  },
+  componentDidMount: function() {
+    worldStore.on('change', this._onStoreChange);
+  },
+  componentWillUnmount: function() {
+    worldStore.off('change', this._onStoreChange);
+  },
+  render: function() {
+    return el.div(
+      null,
+      el.table(
+        {className: 'table'},
+        el.thead(
+          null,
+          el.tr(
+            null,
+            el.th(null, 'ID'),
+            el.th(null, 'Time'),
+            el.th(null, 'User'),
+            el.th(null, 'Wager'),
+            el.th({className: 'text-right'}, 'Target'),
+            // el.th(null, 'Roll'),
+            el.th(null, 'Outcome'),
+            el.th(
+              {
+                style: {
+                  paddingLeft: '50px'
+                }
+              },
+              'Profit'
+            )
+          )
+        ),
+        el.tbody(
+          null,
+          worldStore.state.allBets.toArray().map(function(bet) {
+            return React.createElement(BetRow, { bet: bet, key: bet.bet_id || bet.id });
+          }).reverse()
+        )
+      )
+    );
+  }
+});
+
 var TabContent = React.createClass({
   displayName: 'TabContent',
   _onStoreChange: function() {
@@ -2122,10 +2778,10 @@ var TabContent = React.createClass({
     switch(worldStore.state.currTab) {
       case 'FAUCET':
         return React.createElement(FaucetTabContent, null);
-      case 'ALL_BETS':
-          return React.createElement(MyAllBetsTabContent, null);
       case 'MY_BETS':
         return React.createElement(MyBetsTabContent, null);
+      case 'ALL_BETS':
+        return React.createElement(AllBetsTabContent, null);
       default:
         alert('Unsupported currTab value: ', worldStore.state.currTab);
         break;
@@ -2154,974 +2810,35 @@ var Footer = React.createClass({
   }
 });
 
-var BetBoxWager = React.createClass({
-  displayName: 'BetBoxWager',
-  // Hookup to stores
-  _onStoreChange: function() {
-    this.forceUpdate();
-  },
-  _onBalanceChange: function(e) {
-    
-    // Force validation when user logs in
-    // TODO: Re-force it when user refreshes
-    Dispatcher.sendAction('UPDATE_WAGER', {});
-  },
-  componentDidMount: function() {
-    betStore.on('change', this._onStoreChange);
-    worldStore.on('change', this._onStoreChange);
-    worldStore.on('user_update', this._onBalanceChange);
-  },
-  componentWillUnmount: function() {
-    betStore.off('change', this._onStoreChange);
-    worldStore.off('change', this._onStoreChange);
-    worldStore.off('user_update', this._onBalanceChange);
-  },
-  _onWagerChange: function(e) {
-    var str = e.target.value;
-    betStore.state.profitGained.num = Number(str);
-    Dispatcher.sendAction('UPDATE_WAGER', { str: str });
-  },
-  _onHalveWager: function() {
-    var newWager = Math.round(betStore.state.wager.num / 2);
-    Dispatcher.sendAction('UPDATE_WAGER', { str: newWager.toString() });
-  },
-  _onDoubleWager: function() {
-    var n = betStore.state.wager.num * 2;
-    Dispatcher.sendAction('UPDATE_WAGER', { str: n.toString() });
-
-  },
-  _onMaxWager: function() {
-    // If user is logged in, use their balance as max wager
-    var balanceBits;
-    if (worldStore.state.user) {
-      balanceBits = Math.floor(worldStore.state.user.balance / 100);
-    } else {
-      balanceBits = 42000;
-    }
-    Dispatcher.sendAction('UPDATE_WAGER', { str: balanceBits.toString() });
-  },
-  //
-  render: function() {
-    var style1 = { borderBottomLeftRadius: '0', borderBottomRightRadius: '0' };
-    var style2 = { borderTopLeftRadius: '0' };
-    var style3 = { borderTopRightRadius: '0' };
-	var style60 ={ width: '60%'}
-	var style20 ={ width: '20%'}
-		return el.div({className:"boxCoin"}, 
-			el.h3(null, "WAGER"),
-			el.fieldset(null,
-				el.ul(null,
-					el.li({id:'inputBtc'},
-						el.div({className:'centerContainer'},
-							el.div({className:'buttonCoinCenter'},
-								el.input(
-									{
-									  value: betStore.state.wager.str,
-									  type: 'text',
-									  className: "inputCoin",
-									  onChange: this._onWagerChange,
-									  disabled: !!worldStore.state.isLoading,
-									  placeholder: 'Bits',
-									  id: 'wagerCoinState'
-									}
-								),
-								el.label(
-									{
-									  value: "Bits",
-									  className: "inputCoinLabel",
-									  onChange: this._onWagerChange,
-									  disabled: !!worldStore.state.isLoading,
-									  placeholder: 'Bits'
-									},"Bits"
-								)
-							)
-						)
-					),
-					el.li({id:'BTCMultiplicator'},
-						el.ul(null,
-							el.li(null,
-								el.label(null,
-									el.button(
-										{
-										  id: 'btn12x',
-										  type: 'button',
-										  className:'botonesHotKey',
-										  onClick: this._onHalveWager
-										},
-										'1/2x ', worldStore.state.hotkeysEnabled ? el.kbd({className:"botonHotKey"}, 'X') : ''
-									)
-								)
-							),
-							el.li(null,
-								el.label(null,
-									el.button(
-										{
-										  id: 'btn2x',
-										  className:'botonesHotKey',
-										  type: 'button',
-										  onClick: this._onDoubleWager
-										},
-										'2x ', worldStore.state.hotkeysEnabled ? el.kbd({className:"botonHotKey"}, 'C') : ''
-									)
-								)
-							),
-							el.li(null,
-								el.label(null,
-									el.button(
-										{
-										  id: 'btnMax',
-										  type: 'button',
-										  className:'botonesHotKey',
-										  onClick: this._onMaxWager
-										},
-										'Max ', worldStore.state.hotkeysEnabled ? el.kbd({className:"botonHotKey"}, 'V') : ''
-									)
-								)
-							)
-						
-						)
-					
-					)
-				)
-			)
-		);
-	
-	}
-});
-
-var BetBox = React.createClass({
-  displayName: 'BetBox',
-  _onStoreChange: function() {
-    this.forceUpdate();
-  },
-  componentDidMount: function() {
-    worldStore.on('change', this._onStoreChange);
-  },
-  componentWillUnmount: function() {
-    worldStore.off('change', this._onStoreChange);
-  },
-  render: function() {
-    return 	el.div({className:'backgroundBlock'},
-				el.form({id:"profitsBlock"},
-					el.ul({className:'row'},
-						el.li({className:'col-lg-6 col-md-6 col-sm-6 col-xs-12'},
-							el.ul({className:'row'},
-								el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-									React.createElement(BetBoxWager, null)
-									
-								),
-								el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-									React.createElement(HotkeyToggle, null)
-								)
-							)
-						),
-						el.li({className:'col-lg-6 col-md-6 col-sm-6 col-xs-12'},
-							el.ul({className:'row'},
-								el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-									React.createElement(BetBoxMultiplier, null)
-								),
-								el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-									React.createElement(BetBoxChance, null)
-								),
-								el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-									React.createElement(BetBoxProfit, null)
-								)
-							)
-						),
-						el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-						    el.ul({className:'row'},
-						        React.createElement(ToggleAutomaticRoll1, null)
-						    )
-						),
-						el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12', id:'automaticBet'},
-						    el.ul({className:'row'},
-                                betStore.state.showAutomaticRoll ? React.createElement(ToggleAutomaticRoll, null) : ''
-						    )
-						)
-					)
-				)
-			);
-  }
-});
-
-var ToggleAutomaticRoll1 = React.createClass({
-	displayName: 'ToggleAutomaticRoll',
-    getInitialState: function() {
-        return { waitingForServer: false };
-    },
-	
-    _onStoreChange: function() {
-        this.forceUpdate();
-    },
-    componentDidMount: function() {
-        worldStore.on('change', this._onStoreChange);
-    },
-    componentWillUnmount: function() {
-        worldStore.off('change', this._onStoreChange);
-    },
-	_displayAutomatic: function(){
-        Dispatcher.sendAction("TOGGLE_SHOW_AUTOMATIC_ROLL");
-        this.forceUpdate();
-	},
-	render: function() { 
-		return  el.div(null,
-		            el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-		                el.h5(null,el.span(null, "Automated Betting"))
-				    ),
-		            el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-		                el.div({className:'buttonMoreCenter'},
-		                    el.a(
-                              {
-                                    onClick: this._displayAutomatic,
-                                    className: 'btn buttonMore',
-                                    type: 'button',
-                                    id: 'displayAutomatic'
-                              },
-                              !betStore.state.showAutomaticRoll ? '+' : '-'
-                            )
-		                )
-				    )
-				);
-		}
-});
-
-var ToggleAutomaticRoll = React.createClass({
-	displayName: 'ToggleAutomaticRoll',
-    getInitialState: function() {
-        return { waitingForServer: false };
-    },
-    _onStoreChange: function() {
-        console.log("_onStoreChange");
-        this.forceUpdate();
-    },
-    componentDidMount: function() {
-        worldStore.on('change', this._onStoreChange);
-    },
-    componentWillUnmount: function() {
-        worldStore.off('change', this._onStoreChange);
-    },
-	_AutomaticToggle: function(){
-        Dispatcher.sendAction('AUTOMATIC_BET_WAGER_STATE');
-        this.forceUpdate();
-	},
-	_speedOfBet: function(e){
-	    console.log(e.currentTarget.value);
-	    Dispatcher.sendAction("SET_SPEED_OF_BETS", e.currentTarget.value);
-	    this.forceUpdate();
-	},
-	_numberOfBet: function(e){
-	    console.log(e.currentTarget.value);
-	    Dispatcher.sendAction("SET_AUTOMATIC_NUMBER_OF_BETS", e.currentTarget.value);
-	    this.forceUpdate();
-	},
-	_increaseOnLose: function(e){
-	    Dispatcher.sendAction("SET_INCREASE_ON_LOSE", e.currentTarget.value);
-	    this.forceUpdate();
-	},
-    _increaseOnWin: function(e){
-        Dispatcher.sendAction("SET_INCREASE_ON_WIN", e.currentTarget.value);
-        this.forceUpdate();
-	},
-	_stopRoll: function(){
-	    Dispatcher.sendAction("STOP_ROLL");
-	},
-	_setPercentOnWin: function(e){
-	    Dispatcher.sendAction("SET_PERCENT_ON_WIN", e.currentTarget.value);
-	},
-	_setPercentOnLose: function(e){
-	    Dispatcher.sendAction("SET_PERCENT_ON_LOSE", e.currentTarget.value);
-	},
-	_newLimitNumberOfBet: function(e){
-	    console.log(betStore.state.disableNumberOfBet + "nuevo limite");
-	    var str = e.currentTarget.value;
-	    Dispatcher.sendAction("UPDATE_NUMBER_OF_BETS_LIMIT", {str: str});
-	    
-	    this.forceUpdate();
-	},
-    _makeBetHandler: function(cond) {
-    var self = this;
-    
-    console.assert(cond === '<' || cond === '>');
-
-        return function(e) {
-                $('#wagerCoinState').attr('disabled','true');
-                Dispatcher.sendAction('AUTOMATE_TOGGLE_ROLL');
-                console.log('Placing bet...');
-    
-                // Indicate that we are waiting for server response
-                self.setState({ waitingForServer: true });
-                var profitBet;
-                var hash = betStore.state.nextHash;
-                console.assert(typeof hash === 'string');
-                
-                var wagerSatoshis = betStore.state.profitGained.num * 100;
-                var multiplier = betStore.state.multiplier.num;
-                var payoutSatoshis = wagerSatoshis * multiplier;
-                
-                var number = helpers.calcNumber(
-                cond, helpers.multiplierToWinProb(multiplier)
-                );
-                
-                var params = {
-                    wager: wagerSatoshis,
-                    client_seed: 0, // TODO
-                    hash: hash,
-                    cond: cond,
-                    target: number,
-                    payout: payoutSatoshis
-                };
-
-                MoneyPot.placeSimpleDiceBet(params, {
-                success: function(bet) {
-                  console.log('Successfully placed bet:', bet);
-                  // Append to bet list
-                  profitBet = bet.profit;
-                  // We don't get this info from the API, so assoc it for our use
-                  bet.meta = {
-                    cond: cond,
-                    number: number,
-                    hash: hash,
-                    isFair: CryptoJS.SHA256(bet.secret + '|' + bet.salt).toString() === hash
-                  };
-                  
-                  Dispatcher.sendAction('CHANGE_TAB', 'MY_BETS');
-                  Dispatcher.sendAction('NEW_BET', bet);
-                
-                  // Update next bet hash
-                  Dispatcher.sendAction('SET_NEXT_HASH', bet.next_hash);
-                
-                  // Update user balance
-                  Dispatcher.sendAction('UPDATE_USER', {
-                    balance: worldStore.state.user.balance + bet.profit
-                  });
-                },
-                error: function(xhr) {
-                  console.log('Error');
-                  if (xhr.responseJSON && xhr.responseJSON) {
-                    alert(xhr.responseJSON.error);
-                  } else {
-                    alert('Internal Error');
-                  }
-                },
-                complete: function() {
-                    setTimeout(function() {
-                        self.setState({ waitingForServer: false });
-                        $('#wagerCoinState').attr('disabled',false);
-                        // Force re-validation of wager
-                        Dispatcher.sendAction('UPDATE_WAGER', {
-                            str: betStore.state.wager.str
-                        });
-                        if(betStore.state.automaticToggle){
-                           
-                                if(profitBet > 0){
-                                    if(betStore.state.increaseOnWin == "true"){
-                                        Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.percentOnWin);
-                                    }else{
-                                        Dispatcher.sendAction('RETURN_BASE_BET');
-                                    }
-                                }else{
-                                    if(betStore.state.increaseOnLose == "true"){
-                                        Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.percentOnLose);
-                                    }else{
-                                        Dispatcher.sendAction('RETURN_BASE_BET');
-                                    }
-                                }
-                                if(betStore.state.automaticToggle){
-                                    
-                                        if(cond === '<'){
-                                            $('#automateBet-lo')[0].click();
-                                        }else if(cond === '>') {
-                                            $('#automateBet-hi')[0].click();
-                                        }
-                                    
-                                }
-                          
-                            
-                        }
-                    }.bind(this), betStore.state.betVelocity);
-                    
-                }
-                });
-           
-        };
-    },
-	render: function() { 
-	        var winProb = helpers.multiplierToWinProb(betStore.state.multiplier.num);
-	        var error = betStore.state.wager.error || betStore.state.multiplier.error;
-        	var betHiLowNode
-            if (worldStore.state.isLoading) {
-              // If app is loading, then just disable button until state change
-                betHiLowNode = el.button(
-                    {type: 'button', disabled: true, className: 'btn btn-lg btn-block btn-default'},
-                    'Loading...'
-                );
-            } else if (error) {
-              // If there's a betbox error, then render button in error state
-            
-              var errorTranslations = {
-                'CANNOT_AFFORD_WAGER': 'You cannot afford wager',
-                'INVALID_WAGER': 'Invalid wager',
-                'INVALID_MULTIPLIER': 'Invalid multiplier',
-                'MULTIPLIER_TOO_PRECISE': 'Multiplier too precise',
-                'MULTIPLIER_TOO_HIGH': 'Multiplier too high',
-                'MULTIPLIER_TOO_LOW': 'Multiplier too low'
-              };
-            
-              betHiLowNode = el.button(
-                {type: 'button',
-                 disabled: true,
-                 className: 'btn btn-lg btn-block btn-danger'},
-                errorTranslations[error] || 'Invalid bet'
-              );
-            } else if (worldStore.state.user) {
-                betHiLowNode =
-                el.ul({className:'row'},
-                    el.li({className: 'col-lg-6 col-md-6 col-sm-6 col-xs-6'},
-                		el.a(
-                			{
-                            type:'button',
-                			className: 'blue',
-                			id: 'automateBet-hi',
-                			onClick: this._makeBetHandler('>')
-                			},
-                			el.span({className: 'bets unselectable', style:{position:'relative'}},
-                				el.span(null,"AUTOMATE HIGH"),
-                				el.span({className: 'unselectable autoRateWin'}, '>'+helpers.calcNumber('>',winProb).toFixed(2))
-                			)
-                		)
-                	),
-                	el.li({className: 'col-lg-6 col-md-6 col-sm-6 col-xs-6'},
-                		el.a(
-                			{
-                            type:'button',
-                			className: 'blue',
-                			id: 'automateBet-lo',
-                			onClick: this._makeBetHandler('<')
-                			},
-                			el.span({className: 'bets unselectable', style:{position:'relative'}},
-                				el.span(null,"AUTOMATE LOW"),
-                				el.span({className: 'unselectable autoRateWin'}, '<'+helpers.calcNumber('<',winProb).toFixed(2))
-                			)
-                		)
-                	)
-                );
-            }else {
-            // If user isn't logged in, give them link to /oauth/authorize
-                betHiLowNode = el.a(
-                {
-                  href: config.mp_browser_uri + '/oauth/authorize' +
-                    '?app_id=' + config.app_id +
-                    '&redirect_uri=' + config.redirect_uri,
-                  className: 'btn btn-lg btn-block btn-success'
-                },
-                'Login with MoneyPot'
-                );
-            }
-    	var buttonStopNode = 
-    	        el.ul({className:'row'},
-        			el.li({className: 'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-                        
-                        el.input(
-                            {
-                                type: 'button',
-                                className: ' btn btn-lg btn-block btn-danger',
-                                value: 'STOP ROLL',
-                                onClick: this._stopRoll
-                            }
-                        )
-                    )
-                );
-    	
-		return  el.div(null,
-		            el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-		                el.div({className:'automateBackground'},
-                        		(this.state.waitingForServer) ? buttonStopNode : betHiLowNode
-                		)
-                	),
-                	el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-	                    el.p(null, "Select your betting speed")
-	                ),
-	                el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-		                el.div({className:'speedBackground'},
-		                    el.ul({className:'row'},
-		                        el.li({className:'col-lg-5 col-md-5 col-sm-6 col-xs-6'},
-    		                        el.input(
-    		                            {
-                                            id: 'radioStyle',
-                                            name: 'speedOfBet',
-                                            type: 'radio',
-                                            defaultChecked: "checked",
-                                            onChange: this._speedOfBet,
-                                            value: 'false'
-    		                            }
-                                    ),
-                                    el.label({className:'radioPureCSS1'},
-                                        el.span(null,
-                                            el.span(null)
-                                        ),
-                                        el.label(null, "Average")
-                                       
-                                    )
-                                ),
-                                el.li({className:'col-lg-7 col-md-7 col-sm-6 col-xs-6'},
-    		                        el.input(
-    		                            {
-    		                               id: 'radioStyle',
-    		                               name: 'speedOfBet',
-    		                               type: 'radio',
-    		                               onChange: this._speedOfBet,
-    		                               value: 'true'
-    		                            }
-                                    ),
-                                    el.label({className:'radioPureCSS1'},
-                                        el.span(null,
-                                            el.span(null)
-                                        ),
-                                        el.label(null, "Sharp Speed!")
-                                    )
-                                )
-                            )
-	                    )   
-	                ),
-                	el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-	                    el.p(null, "Limit number of Bets")
-	                ),
-		            el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-		                el.div({className:'automateBackground'},
-		                    el.ul({className:'row'},
-		                        el.li({className:'col-lg-5 col-md-5 col-sm-6 col-xs-6'},
-    		                        el.input(
-    		                            {
-                                            id: 'radioStyle',
-                                            name: 'numberOfBet',
-                                            type: 'radio',
-                                            defaultChecked: "checked",
-                                            onChange: this._numberOfBet,
-                                            value: 'false'
-    		                            }
-                                    ),
-                                    el.label({className:'radioPureCSS1'},
-                                        el.span(null,
-                                            el.span(null)
-                                        ),
-                                        el.label(null, "Unlimited")
-                                       
-                                    )
-                                ),
-                                el.li({className:'col-lg-7 col-md-7 col-sm-6 col-xs-6'},
-    		                        el.input(
-    		                            {
-    		                               id: 'radioStyle',
-    		                               name: 'numberOfBet',
-    		                               type: 'radio',
-    		                               onChange: this._numberOfBet,
-    		                               value: 'true'
-    		                            }
-                                    ),
-                                    el.label({className:'radioPureCSS1'},
-                                        el.span(null,
-                                            el.span(null)
-                                        ),
-                                        el.label(null, "Amount")
-                                    ),
-                                    el.input(
-                                        {
-                                            type:'text',
-                                            className:'autoAmount',
-                                            value: betStore.state.NumberOfBetLimit.str,
-                                            onChange: this._newLimitNumberOfBet,
-                                            disabled: betStore.state.disableNumberOfBet
-                                        }
-                                    )
-                                )
-                            )
-	                    )   
-	                ),
-	                el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-	                    el.p(null, "On Lose")
-	                ),
-		            el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-		                el.div({className:'automateBackground'},
-		                    el.ul({className:'row'},
-		                        el.li({className:'col-lg-5 col-md-5 col-sm-6 col-xs-6'},
-    		                        el.input(
-    		                            {
-    		                               id: 'radioStyle',
-    		                               name: 'returnOnWin',
-    		                               type: 'radio',
-    		                               defaultChecked: "checked",
-    		                               onChange: this._increaseOnLose,
-    		                               value: false
-    		                            }
-                                    ),
-                                    el.label({className:'radioPureCSS1'},
-                                        el.span(null,
-                                            el.span(null)
-                                        ),
-                                        el.label(null, "Return to Base")
-                                       
-                                    )
-                                ),
-                                el.li({className:'col-lg-7 col-md-7 col-sm-6 col-xs-6'},
-    		                        el.input(
-    		                            {
-    		                               id: 'radioStyle',
-    		                               name: 'returnOnWin',
-    		                               type: 'radio',
-    		                               onChange: this._increaseOnLose,
-    		                               value: true
-    		                            }
-                                    ),
-                                    el.label({className:'radioPureCSS1'},
-                                        el.span(null,
-                                            el.span(null)
-                                        ),
-                                        el.label(null, "Increase Bet")
-                                    ),
-                                    el.label({className:'autoRollInputLabel'}, "%"),
-                                    el.input(
-                                        {
-                                            type:'text',
-                                            className:'returnAmount',
-                                            onChange: this._setPercentOnLose,
-                                            value: betStore.state.percentOnLose
-                                        }
-                                    )
-                                )
-                            )
-	                    )   
-	                ),
-	                el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-	                    el.p(null, "On Win")
-	                ),
-		            el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-		                el.div({className:'automateBackground'},
-		                    el.ul({className:'row'},
-		                        el.li({className:'col-lg-5 col-md-5 col-sm-6 col-xs-6'},
-    		                        el.input(
-    		                            {
-    		                               id: 'radioStyle',
-    		                               name: 'returnOnLose',
-    		                               type: 'radio',
-    		                               defaultChecked: "checked",
-    		                               onChange: this._increaseOnWin,
-    		                               value: false
-    		                            }
-                                    ),
-                                    el.label({className:'radioPureCSS1'},
-                                        el.span(null,
-                                            el.span(null)
-                                        ),
-                                        el.label(null, "Return to Base")
-                                       
-                                    )
-                                ),
-                                el.li({className:'col-lg-7 col-md-7 col-sm-6 col-xs-6'},
-    		                        el.input(
-    		                            {
-    		                               id: 'radioStyle',
-    		                               name: 'returnOnLose',
-    		                               type: 'radio',
-    		                               onChange: this._increaseOnWin,
-    		                               value: true
-    		                            }
-                                    ),
-                                    el.label({className:'radioPureCSS1'},
-                                        el.span(null,
-                                            el.span(null)
-                                        ),
-                                        el.label(null, "Increase Bet")
-                                    ),
-                                    el.label({className:'autoRollInputLabel'}, "%"),
-                                    el.input(
-                                        {
-                                            type:'text',
-                                            className:'returnAmount',
-                                            onChange: this._setPercentOnWin,
-                                            value: betStore.state.percentOnWin
-                                        }
-                                    )
-                                )
-                            )
-	                    )   
-	                )
-					
-				);
-		}
-});
-
-
-var BetBoxRoll = React.createClass({
-	displayName: 'BetBoxRoll',
-	render: function() { 
-		return  el.div({className:'backgroundBlueSky', id: 'betBoxButton'},
-					React.createElement(BetBoxButton, null)
-					
-				);
-		}
-});
-			
-var DiceAnimation = React.createClass({
-	displayName: 'DiceAnimation',
-	render: function() { 
-		return  el.div({className:'backgroundBlock'},
-				    el.div({className:'row'},
-				        el.div({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-				            el.div({className:'diceRollContainer'},
-                                el.img({ id:'imagenGif', onerror:'this.style.display = "none"'},
-                                    el.div({className:'numberRolled',id:'numberRolled'})
-                                )
-				            )    
-                        )
-                    )
-				)
-		}
-});
-
 var App = React.createClass({
-    displayName: 'App',
-    _onStoreChange: function() {
-        console.log("_onStoreChange");
-        this.forceUpdate();
-    },
-    componentDidMount: function() {
-        betStore.on('change', this._onStoreChange);
-        chatStore.on('change', this._onStoreChange);
-        footerStore.on('change', this._onStoreChange);
-    },
-    componentWillUnmount: function() {
-        betStore.off('change', this._onStoreChange);
-        chatStore.off('change', this._onStoreChange);
-        footerStore.on('change', this._onStoreChange);
-    },
-    render: function() {
-			return el.div(null,
-			    el.div(null,chatStore.state.showUserList ? React.createElement(ChatUserList, null) : ''),
-			    el.div(null,betStore.state.showHashPopup ? React.createElement(NextHashPopup, null) : ''),
-			    el.div(null,footerStore.state.showFooterPopup ? React.createElement(FooterPopup, null) : ''),
-				el.header(null,
-					el.div({className:'full-row'},
-						el.div({className: 'container'},
-							// Navbar
-							React.createElement(Navbar, null)
-						)
-					)
-				),
-				
-				el.div({className: 'container'},
-					// BetBox & ChatBox
-					el.div({className: 'row section'},
-						el.div({className: 'col-lg-5 col-md-5 col-sm-12 col-xs-12 containBlock'},
-							el.ul({className:'row'},
-								el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12', id:'roller'},
-									React.createElement(BetBox, null),
-									!betStore.state.showAutomaticRoll ? React.createElement(BetBoxRoll, null) : ''
-								),
-								el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12', id:"diceBlock"},
-									!betStore.state.showAutomaticRoll ? React.createElement(DiceAnimation, null) : ''
-								)
-								
-							)
-						),
-						el.div({className: 'col-lg-7 col-md-7 col-sm-12 col-xs-12 containBlock'},
-						    el.ul({className:'row'},
-                                el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12', id:"chatBox"},
-									React.createElement(ChatBox, null)
-								)
-							),
-							el.ul({className:'row'},
-								el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12', id:"tabsBox"},
-									React.createElement(Tabs, null),
-									React.createElement(TabContent, null)
-								)
-							)
-						)
-					)
-				),
-				el.footer(null,
-					el.div({className:'full-row'},
-						el.div({className: 'container'},
-							// Navbar
-							React.createElement(Footer, null)
-						)
-					)
-				)
-			);
-  }
-});
-
-// FOOTER MODAL AND FOOTER LINKS
-var FooterPopup = React.createClass({
-  displayName: 'ChatUserList',
-  _disableModal :function(){
-      Dispatcher.sendAction('TOGGLE_FOOTER_POPUP');
-  },
-    render: function() {
-        return (
-            el.div({className:'modalFooterPopup'},
-                el.div({className: 'modalBk', onClick:this._disableModal}
-                ),
-                el.div({className: 'modalCntnt'},
-                    el.div({className: "policyImageCntnt"},
-                        el.div({id:'policyImage', className:footerStore.state.classNameImage}),
-                        el.span({className: 'sharpPolicyImage'})
-                       
-                    ),
-                    el.div({className: "policyTextCntnt"},
-                        el.h4({id:'policy-tittle'},''),
-                        el.h5(null,el.br(null)),
-                        el.div({className: 'panel-heading'},
-                               el.p({id: 'policyTextCntnt'})
-                        ),
-                        el.h5(null,el.br(null)),
-                        el.div({className:'closeModal'},
-            				el.a({
-            						type:'button',
-            						className:'dps-drw col-lg-5 col-md-5 col-xs-5 col-sm-5',
-            						disabled: true,
-            						href:'#',
-            						onClick: this._disableModal
-                				},
-            				        'Close'
-                    		)
-            			)
-                    )
-                )
-                
-            )
-        );
-    }
-});
-
-var Footer = React.createClass({
-    displayName: 'Footer',
-    _responsibleBetting: function(){
-        this._openFooterPopup("responsible-betting");
-        $.get('policy-text/responsible-betting.html', function(data) {
-            $('#policyTextCntnt').html(data);
-            $('#policy-tittle').text('RESPONSIBLE BETTING');
-        });
-    },
-    _aboutUs: function(){
-        this._openFooterPopup("about-us");
-        $.get('policy-text/about-us.html', function(data) {
-            $('#policyTextCntnt').html(data);
-            $('#policy-tittle').text('ABOUT US');
-        });
-    },
-    _aboutMoneypot: function(){
-        this._openFooterPopup("about-moneypot");
-        $.get('policy-text/about-moneypot.html', function(data) {
-            $('#policyTextCntnt').html(data);
-            $('#policy-tittle').text('ABOUT MONEYPOT');
-        });
-    },
-    _whatIsBitcoin: function(){
-        this._openFooterPopup("what-is-bitcoin");
-        $.get('policy-text/what-is-bitcoin.html', function(data) {
-            $('#policyTextCntnt').html(data);
-            $('#policy-tittle').text('WHAT IS BITCOIN?');
-        });
-    },
-    _provablyFair: function(){
-        this._openFooterPopup("provably-fair");
-        $.get('policy-text/provably-fair.html', function(data) {
-            $('#policyTextCntnt').html(data);
-            $('#policy-tittle').text('PROVABLY FAIR');
-        });
-    },
-    
-    _openFooterPopup: function(value){
-        Dispatcher.sendAction('TOGGLE_FOOTER_POPUP', value);
-    },
+  displayName: 'App',
   render: function() {
-    return el.div({className: 'row'},
-		el.ul({className: 'col-lg-9 col-md-9 col-sm-9 col-xs-9'},
-			el.li({className:'footerLinks'},
-			    el.a({
-			            href: '#',
-			            onClick: this._responsibleBetting
-    			    }, 
-			        el.div({className:'dividerFooter'},
-			            el.span(null, 'Responsible betting')
-			        )
-			    )
-			),
-			el.li({className:'footerLinks'},
-			    el.a({
-			            href: '#',
-			            onClick: this._aboutUs
-    			    }, 
-			        el.div({className:'dividerFooter'},
-			            el.span(null, 'About us')
-			        )
-			    )
-			),
-			el.li({className:'footerLinks'},
-			    el.a({
-			            href: '#',
-			            onClick: this._aboutMoneypot
-    			    }, 
-			        el.div({className:'dividerFooter'},
-			            el.span(null, 'About Moneypot')
-			        )
-			    )
-			),
-			el.li({className:'footerLinks'},
-			    el.a({
-			            href: '#',
-			            onClick: this._whatIsBitcoin
-    			    }, 
-			        el.div({className:'dividerFooter'},
-			            el.span(null, 'What is Bitcoin?')
-			        )
-			    )
-			),
-			el.li({className:'footerLinks'},
-			    el.a({
-			            href: '#',
-			            onClick: this._provablyFair
-    			    }, 
-			        el.div(null,
-			            el.span(null, 'What is Provably Fair?')
-			        )
-			    )
-			)
-		),
-		
-		el.ul({className: 'col-lg-3 col-md-3 col-sm-3 col-xs-3'},
-			el.li({className: 'imagesFooter'},
-			    el.a({
-			            href:'http://www.facebook.com/SharpDice'
-			        },
-			        el.span({className:'facebookImage'})
-			    )
-			),
-			el.li({className: 'imagesFooter'},
-			    el.a({
-			            href:'http://www.twitter.com/SharpDiceBTC'
-			        },
-			        el.span({className:'twitterImage'})
-			    )
-			),
-			el.li({className: 'imagesFooter'},
-			    el.a({
-			            href:'#'
-			        },
-			    el.span({className:'googleImage'})
-			    )
-			),
-			el.li({className: 'imagesFooter'},
-			    el.a({
-			            href:'http://www.reddit.com/r/SharpDice'
-			        },
-			    el.span({className:'redditImage'})
-			    )
-			)
-		)
-	
-	);
-
+    return el.div(
+      {className: 'container'},
+      // Navbar
+      React.createElement(Navbar, null),
+      // BetBox & ChatBox
+      el.div(
+        {className: 'row'},
+        el.div(
+          {className: 'col-sm-5'},
+          React.createElement(BetBox, null)
+        ),
+        el.div(
+          {className: 'col-sm-7'},
+          React.createElement(ChatBox, null)
+        )
+      ),
+      // Tabs
+      el.div(
+        {style: {marginTop: '15px'}},
+        React.createElement(Tabs, null)
+      ),
+      // Tab Contents
+      React.createElement(TabContent, null),
+      // Footer
+      React.createElement(Footer, null)
+    );
   }
 });
 
@@ -3155,6 +2872,16 @@ if (!worldStore.state.accessToken) {
   MoneyPot.generateBetHash({
     success: function(data) {
       Dispatcher.sendAction('SET_NEXT_HASH', data.hash);
+    }
+  });
+  // Fetch latest all-bets to populate the all-bets tab
+  MoneyPot.listBets({
+    success: function(bets) {
+      console.log('[MoneyPot.listBets]:', bets);
+      Dispatcher.sendAction('INIT_ALL_BETS', bets.reverse());
+    },
+    error: function(err) {
+      console.error('[MoneyPot.listBets] Error:', err);
     }
   });
 }
@@ -3208,6 +2935,18 @@ function connectToChatServer() {
       Dispatcher.sendAction('USER_LEFT', user);
     });
 
+    socket.on('new_bet', function(bet) {
+      console.log('[socket] New bet:', bet);
+
+      // Ignore bets that aren't of kind "simple_dice".
+      if (bet.kind !== 'simple_dice') {
+        console.log('[weird] received bet from socket that was NOT a simple_dice bet');
+        return;
+      }
+
+      Dispatcher.sendAction('NEW_ALL_BET', bet);
+    });
+
     // Received when your client doesn't comply with chat-server api
     socket.on('client_error', function(text) {
       console.warn('[socket] Client error:', text);
@@ -3219,7 +2958,7 @@ function connectToChatServer() {
     var authPayload = {
       app_id: config.app_id,
       access_token: worldStore.state.accessToken,
-      subscriptions: ['CHAT', 'DEPOSITS']
+      subscriptions: ['CHAT', 'DEPOSITS', 'BETS']
     };
 
     socket.emit('auth', authPayload, function(err, data) {
@@ -3242,7 +2981,7 @@ function onRecaptchaLoad() {
 }
 
 $(document).on('keydown', function(e) {
-  var H = 72, L = 76, C = 67, X = 88, V = 86, keyCode = e.which;
+  var H = 72, L = 76, C = 67, X = 88, keyCode = e.which;
 
   // Bail is hotkeys aren't currently enabled to prevent accidental bets
   if (!worldStore.state.hotkeysEnabled) {
@@ -3250,7 +2989,7 @@ $(document).on('keydown', function(e) {
   }
 
   // Bail if it's not a key we care about
-  if (keyCode !== H && keyCode !== L && keyCode !== X && keyCode !== C && keyCode !== V) {
+  if (keyCode !== H && keyCode !== L && keyCode !== X && keyCode !== C) {
     return;
   }
 
@@ -3272,30 +3011,19 @@ $(document).on('keydown', function(e) {
         num: downWager,
         str: downWager.toString()
       });
-	  break;
-	case V:  // Decrease wager
-      var maxWager;
-		if (worldStore.state.user) {
-			maxWager = Math.floor(worldStore.state.user.balance / 100);
-		} else {
-			maxWager = 42000;
-		}
-      Dispatcher.sendAction('UPDATE_WAGER', {
-        num: maxWager,
-        str: maxWager.toString()
-      });
-	  
+
       break;
     case L:  // Bet lo
-      $('#bet-lo')[0].click();
+      $('#bet-lo').click();
       break;
     case H:  // Bet hi
-      $('#bet-hi')[0].click();
+      $('#bet-hi').click();
       break;
     default:
       return;
   }
 });
+
 window.addEventListener('message', function(event) {
   if (event.origin === config.mp_browser_uri && event.data === 'UPDATE_BALANCE') {
     Dispatcher.sendAction('START_REFRESHING_USER');
