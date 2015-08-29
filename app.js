@@ -592,13 +592,13 @@ var betStore = new Store('bet', {
             Dispatcher.sendAction('STOP_ROLL');
         }else if (!isNaN(parseInt(betStore.state.stopMinBalance))) {
           //if((worldStore.state.user.balance / 100) >= betStore.state.stopMaxBalance || (worldStore.state.user.balance / 100) <= betStore.state.stopMinBalance)
-            if (betStore.state.stopMinBalance >= worldStore.state.user.balance) {
+            if (betStore.state.stopMinBalance >= (worldStore.state.user.balance /100)) {
               Dispatcher.sendAction('STOP_ROLL');
             }else {
               betStore.state.betCounter++;
             } 
         }else if (!isNaN(parseInt(betStore.state.stopMaxBalance))) {
-            if (betStore.state.stopMaxBalance <= worldStore.state.user.balance) {
+            if (betStore.state.stopMaxBalance <= (worldStore.state.user.balance /100)) {
               Dispatcher.sendAction('STOP_ROLL');
             }else {
               betStore.state.betCounter++;
