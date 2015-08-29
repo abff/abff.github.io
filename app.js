@@ -1443,7 +1443,6 @@ var BetBoxWager = React.createClass({
   _onWagerChange: function(e) {
     var str = e.target.value;
     Dispatcher.sendAction('UPDATE_WAGER', { str: str });
-    this.forceUpdate();
   },
   _onHalveWager: function() {
     var newWager = Math.round(betStore.state.wager.num / 2);
@@ -1985,7 +1984,7 @@ var ToggleAutomaticRoll = React.createClass({
                           $('#wagerCoinState').attr('disabled',false);
                           // Force re-validation of wager
                           Dispatcher.sendAction('UPDATE_WAGER', {
-                              str: betStore.state.wager.str
+                            str: betStore.state.wager.str
                           });
                           
                              
