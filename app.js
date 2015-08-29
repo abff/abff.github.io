@@ -1443,6 +1443,7 @@ var BetBoxWager = React.createClass({
   _onWagerChange: function(e) {
     var str = e.target.value;
     Dispatcher.sendAction('UPDATE_WAGER', { str: str });
+    this.forceUpdate();
   },
   _onHalveWager: function() {
     var newWager = Math.round(betStore.state.wager.num / 2);
