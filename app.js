@@ -1793,6 +1793,7 @@ var ToggleAutomaticRoll1 = React.createClass({
     },
     componentDidMount: function() {
         worldStore.on('change', this._onStoreChange);
+        this.forceUpdate();
     },
     componentWillUnmount: function() {
         worldStore.off('change', this._onStoreChange);
