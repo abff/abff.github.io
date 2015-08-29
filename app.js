@@ -624,7 +624,7 @@ var betStore = new Store('bet', {
         self.emitter.emit('change', self.state);
     });
     Dispatcher.registerCallback("AUGMENT_PROFIT", function(multi){
-        var profitQuantity = (betStore.state.profitGained.num * Number(multi));
+        var profitQuantity = betStore.state.profitGained.num * Number(multi);
         var balanceQuantity = worldStore.state.user.balance / 100;
         if(balanceQuantity > profitQuantity){
             betStore.state.profitGained.num = profitQuantity;
