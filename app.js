@@ -628,7 +628,8 @@ var betStore = new Store('bet', {
     Dispatcher.registerCallback("SET_MULTI_ON_WIN", function(multiOnWin){
         var n = parseInt(multiOnWin, 10);
         if (isNaN(n) || /[^\d]/.test(n.toString())) {
-          self.state.automaticWager.error = 'INVALID_WAGER';
+          betStore.state.multiOnWin = '';
+          self.state.automaticWager.error = 'INVALID_MULTIPLIER';
         }else {
           betStore.state.multiOnWin = n;
         }
@@ -637,7 +638,8 @@ var betStore = new Store('bet', {
     Dispatcher.registerCallback("SET_MULTI_ON_LOSE", function(multiOnLose){
         var n = parseInt(multiOnLose, 10);
         if (isNaN(n) || /[^\d]/.test(n.toString())) {
-          self.state.automaticWager.error = 'INVALID_WAGER';
+          betStore.state.multiOnLose = '';
+          self.state.automaticWager.error = 'INVALID_MULTIPLIER';
         }else {
           betStore.state.multiOnLose = n;
         }
