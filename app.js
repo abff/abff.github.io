@@ -600,7 +600,6 @@ var betStore = new Store('bet', {
         betStore.state.increaseOnWin = false;
         betStore.state.increaseOnLose = false;
         betStore.state.checkBoxNumberOfBet = false;
-        
         self.emitter.emit('change', self.state);
     });
   
@@ -1799,7 +1798,7 @@ var ToggleAutomaticRoll1 = React.createClass({
     },
   _displayAutomatic: function(){
         Dispatcher.sendAction("TOGGLE_SHOW_AUTOMATIC_ROLL");
-        this.forceUpdate();
+        //this.forceUpdate();
   },
   render: function() { 
     return  el.div(null,
@@ -1810,7 +1809,6 @@ var ToggleAutomaticRoll1 = React.createClass({
                     el.div({className:'buttonMoreCenter'},
                         el.a(
                               {
-                                    href: 'javascript:void(0)',
                                     onClick: this._displayAutomatic,
                                     className: 'btn buttonMore',
                                     type: 'button',
@@ -2288,7 +2286,6 @@ var ToggleAutomaticRoll = React.createClass({
                   )
           
         );
-        this.forceUpdate();
     }
 });
 
