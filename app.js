@@ -605,7 +605,6 @@ var betStore = new Store('bet', {
         }
         if (stop) {
           Dispatcher.sendAction("STOP_ROLL");
-          setTimeout(console.log('delayed'), 1000);
         }else {
             betStore.state.betCounter++;
         }
@@ -1920,94 +1919,96 @@ var ToggleAutomaticRoll = React.createClass({
         return function(e) {
                 $('#wagerCoinState').attr('disabled','true');
                 Dispatcher.sendAction('AUTOMATE_TOGGLE_ROLL');
-                console.log('Placing bet...');
-    
-                // Indicate that we are waiting for server response
-                self.setState({ waitingForServer: true });
-                var profitBet;
-                var hash = betStore.state.nextHash;
-                console.assert(typeof hash === 'string');
-                
-                var wagerSatoshis = betStore.state.profitGained.num * 100;
-                var multiplier = betStore.state.multiplier.num;
-                var payoutSatoshis = wagerSatoshis * multiplier;
-                
-                var number = helpers.calcNumber(
-                cond, helpers.multiplierToWinProb(multiplier)
-                );
-                
-                var params = {
-                    wager: wagerSatoshis,
-                    client_seed: 0, // TODO
-                    hash: hash,
-                    cond: cond,
-                    target: number,
-                    payout: payoutSatoshis
-                };
-
-                MoneyPot.placeSimpleDiceBet(params, {
-                success: function(bet) {
-                  console.log('Successfully placed bet:', bet);
-                  // Append to bet list
-                  profitBet = bet.profit;
-                  // We don't get this info from the API, so assoc it for our use
-                  bet.meta = {
-                    cond: cond,
-                    number: number,
-                    hash: hash,
-                    isFair: CryptoJS.SHA256(bet.secret + '|' + bet.salt).toString() === hash
-                  };
+                if(betStore.state.automaticToggle){
+                  console.log('Placing bet...');
+      
+                  // Indicate that we are waiting for server response
+                  self.setState({ waitingForServer: true });
+                  var profitBet;
+                  var hash = betStore.state.nextHash;
+                  console.assert(typeof hash === 'string');
                   
-                  Dispatcher.sendAction('CHANGE_TAB', 'MY_BETS');
-                  Dispatcher.sendAction('NEW_BET', bet);
-                
-                  // Update next bet hash
-                  Dispatcher.sendAction('SET_NEXT_HASH', bet.next_hash);
-                
-                  // Update user balance
-                  Dispatcher.sendAction('UPDATE_USER', {
-                    balance: worldStore.state.user.balance + bet.profit
-                  });
-                },
-                error: function(xhr) {
-                  console.log('Error');
-                  if (xhr.responseJSON && xhr.responseJSON) {
-                    alert(xhr.responseJSON.error);
-                  } else {
-                    alert('Internal Error');
-                  }
-                },
-                complete: function() {
-                    setTimeout(function() {
-                        self.setState({ waitingForServer: false });
-                        $('#wagerCoinState').attr('disabled',false);
-                        // Force re-validation of wager
-                        Dispatcher.sendAction('UPDATE_WAGER', {
-                            str: betStore.state.wager.str
-                        });
-                        if(betStore.state.automaticToggle){
-                           
-                                if(profitBet > 0) {
-                                    Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.multiOnWin);
-                                }else{
-                                    Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.multiOnLose);
-                                }
-                                if(betStore.state.automaticToggle){
-                                    
-                                        if(cond === '<'){
-                                            $('#automateBet-lo')[0].click();
-                                        }else if(cond === '>') {
-                                            $('#automateBet-hi')[0].click();
-                                        }
-                                    
-                                }
-                          
-                            
-                        }
-                    }.bind(this), betStore.state.betVelocity);
+                  var wagerSatoshis = betStore.state.profitGained.num * 100;
+                  var multiplier = betStore.state.multiplier.num;
+                  var payoutSatoshis = wagerSatoshis * multiplier;
+                  
+                  var number = helpers.calcNumber(
+                  cond, helpers.multiplierToWinProb(multiplier)
+                  );
+                  
+                  var params = {
+                      wager: wagerSatoshis,
+                      client_seed: 0, // TODO
+                      hash: hash,
+                      cond: cond,
+                      target: number,
+                      payout: payoutSatoshis
+                  };
+
+                  MoneyPot.placeSimpleDiceBet(params, {
+                  success: function(bet) {
+                    console.log('Successfully placed bet:', bet);
+                    // Append to bet list
+                    profitBet = bet.profit;
+                    // We don't get this info from the API, so assoc it for our use
+                    bet.meta = {
+                      cond: cond,
+                      number: number,
+                      hash: hash,
+                      isFair: CryptoJS.SHA256(bet.secret + '|' + bet.salt).toString() === hash
+                    };
                     
+                    Dispatcher.sendAction('CHANGE_TAB', 'MY_BETS');
+                    Dispatcher.sendAction('NEW_BET', bet);
+                  
+                    // Update next bet hash
+                    Dispatcher.sendAction('SET_NEXT_HASH', bet.next_hash);
+                  
+                    // Update user balance
+                    Dispatcher.sendAction('UPDATE_USER', {
+                      balance: worldStore.state.user.balance + bet.profit
+                    });
+                  },
+                  error: function(xhr) {
+                    console.log('Error');
+                    if (xhr.responseJSON && xhr.responseJSON) {
+                      alert(xhr.responseJSON.error);
+                    } else {
+                      alert('Internal Error');
+                    }
+                  },
+                  complete: function() {
+                      setTimeout(function() {
+                          self.setState({ waitingForServer: false });
+                          $('#wagerCoinState').attr('disabled',false);
+                          // Force re-validation of wager
+                          Dispatcher.sendAction('UPDATE_WAGER', {
+                              str: betStore.state.wager.str
+                          });
+                          
+                             
+                              if(profitBet > 0) {
+                                  Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.multiOnWin);
+                              }else{
+                                  Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.multiOnLose);
+                              }
+                              if(betStore.state.automaticToggle){
+                                  
+                                      if(cond === '<'){
+                                          $('#automateBet-lo')[0].click();
+                                      }else if(cond === '>') {
+                                          $('#automateBet-hi')[0].click();
+                                      }
+                                  
+                              }
+                            
+                              
+                          
+                      }.bind(this), betStore.state.betVelocity);
+                      
+                  }
+                  });
                 }
-                });
            
         };
     },
