@@ -600,7 +600,6 @@ var betStore = new Store('bet', {
         betStore.state.increaseOnWin = false;
         betStore.state.increaseOnLose = false;
         betStore.state.checkBoxNumberOfBet = false;
-        
         self.emitter.emit('change', self.state);
     });
   
