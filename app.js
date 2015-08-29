@@ -545,6 +545,9 @@ var betStore = new Store('bet', {
         self.state.wager.error = null;
         self.state.wager.str = n.toString();
         self.state.wager.num = n;
+        if (!betStore.state.automaticToggle) {
+          self.state.profitGained.num = self.state.wager.num;
+        }
       }
     }
 
@@ -1929,7 +1932,7 @@ var ToggleAutomaticRoll = React.createClass({
                   var hash = betStore.state.nextHash;
                   console.assert(typeof hash === 'string');
                   
-                  var wagerSatoshis = betStore.state.wager.num * 100;
+                  var wagerSatoshis = betStore.state.profitGained.num * 100;
                   var multiplier = betStore.state.multiplier.num;
                   var payoutSatoshis = wagerSatoshis * multiplier;
                   
