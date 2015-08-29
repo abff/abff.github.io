@@ -600,7 +600,7 @@ var betStore = new Store('bet', {
         betStore.state.increaseOnWin = false;
         betStore.state.increaseOnLose = false;
         betStore.state.checkBoxNumberOfBet = false;
-        this.forceUpdate();
+        
         self.emitter.emit('change', self.state);
     });
   
@@ -2056,6 +2056,7 @@ var ToggleAutomaticRoll = React.createClass({
                 },
                 'Login with MoneyPot'
                 );
+                this.forceUpdate();
             }
       var buttonStopNode = 
               el.ul({className:'row'},
