@@ -1798,7 +1798,7 @@ var ToggleAutomaticRoll1 = React.createClass({
     },
   _displayAutomatic: function(){
         Dispatcher.sendAction("TOGGLE_SHOW_AUTOMATIC_ROLL");
-        //this.forceUpdate();
+        this.forceUpdate();
   },
   render: function() { 
     return  el.div(null,
