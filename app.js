@@ -667,6 +667,7 @@ var betStore = new Store('bet', {
       }else {
         betStore.state.stopMaxBalance = n;
       }
+      self.emitter.emit('change', self.state);
     });
     Dispatcher.registerCallback("SET_STOP_MIN_BALANCE", function(stopMinBalance){
       var n = parseInt(stopMinBalance, 10);
@@ -675,6 +676,7 @@ var betStore = new Store('bet', {
       }else {
         betStore.state.stopMinBalance = n;
       }
+      self.emitter.emit('change', self.state);
     });
     
     Dispatcher.registerCallback("STOP_ROLL", function(){
