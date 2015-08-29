@@ -513,6 +513,9 @@ var betStore = new Store('bet', {
 }, function() {
   var self = this;
 
+  Dispatcher.registerCallback("UPDATE_DOM", function (){
+    self.emitter.emit('change', self.state);
+  });
   Dispatcher.registerCallback('SET_NEXT_HASH', function(hexString) {
     self.state.nextHash = hexString;
     self.emitter.emit('change', self.state);
@@ -1842,6 +1845,7 @@ var ToggleAutomaticRoll1 = React.createClass({
   _displayAutomatic: function(){
         Dispatcher.sendAction("TOGGLE_SHOW_AUTOMATIC_ROLL");
         this.forceUpdate();
+        Dispatcher.sendAction("UPDATE_DOM");
   },
   render: function() { 
     return  el.div(null,
