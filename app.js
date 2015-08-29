@@ -489,8 +489,8 @@ var betStore = new Store('bet', {
   },
   showAutomaticRoll: false,
   automaticToggle: false,
-  increaseOnWin: false,
-  increaseOnLose: false,
+  increaseOnWin: true,
+  increaseOnLose: true,
   multiOnWin:0,
   multiOnLose:0,
   betCounter: 1,
@@ -597,8 +597,8 @@ var betStore = new Store('bet', {
     Dispatcher.registerCallback('TOGGLE_SHOW_AUTOMATIC_ROLL', function() {
         console.log('[BetStore] received TOGGLE_SHOW_AUTOMATIC_ROLL');
         betStore.state.showAutomaticRoll = !betStore.state.showAutomaticRoll;
-        betStore.state.increaseOnWin = false;
-        betStore.state.increaseOnLose = false;
+        betStore.state.increaseOnWin = true;
+        betStore.state.increaseOnLose = true;
         betStore.state.checkBoxNumberOfBet = false;
         self.emitter.emit('change', self.state);
     });
@@ -614,14 +614,6 @@ var betStore = new Store('bet', {
     });
     
     
-    Dispatcher.registerCallback("SET_INCREASE_ON_WIN", function(increaseOnWin){
-        betStore.state.increaseOnWin = increaseOnWin;
-        self.emitter.emit('change', self.state);
-    });
-    Dispatcher.registerCallback("SET_INCREASE_ON_LOSE", function(increaseOnLose){
-        betStore.state.increaseOnLose = increaseOnLose;
-        self.emitter.emit('change', self.state);
-    });
     Dispatcher.registerCallback("AUGMENT_PROFIT", function(multi){
         var profitQuantity = betStore.state.profitGained.num * Number(multi);
         var balanceQuantity = worldStore.state.user.balance / 100;
@@ -634,7 +626,8 @@ var betStore = new Store('bet', {
         self.emitter.emit('change', self.state);
     });
     Dispatcher.registerCallback("SET_MULTI_ON_WIN", function(multiOnWin){
-        betStore.state.multiOnWin = multiOnWin;
+        var n = parseInt(multiOnWin, 10);
+        betStore.state.multiOnWin = n;
         self.emitter.emit('change', self.state);
     });
     Dispatcher.registerCallback("SET_MULTI_ON_LOSE", function(multiOnLose){
@@ -1846,14 +1839,6 @@ var ToggleAutomaticRoll = React.createClass({
       Dispatcher.sendAction("SET_AUTOMATIC_NUMBER_OF_BETS", e.currentTarget.value);
       this.forceUpdate();
   },
-  _increaseOnLose: function(e){
-      Dispatcher.sendAction("SET_INCREASE_ON_LOSE", e.currentTarget.value);
-      this.forceUpdate();
-  },
-    _increaseOnWin: function(e){
-        Dispatcher.sendAction("SET_INCREASE_ON_WIN", e.currentTarget.value);
-        this.forceUpdate();
-  },
   _stopRoll: function(){
       Dispatcher.sendAction("STOP_ROLL");
   },
@@ -1947,18 +1932,10 @@ var ToggleAutomaticRoll = React.createClass({
                         });
                         if(betStore.state.automaticToggle){
                            
-                                if(profitBet > 0){
-                                    if(betStore.state.increaseOnWin == "true"){
-                                        Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.multiOnWin);
-                                    }else{
-                                        Dispatcher.sendAction('RETURN_BASE_BET');
-                                    }
+                                if(profitBet > 0) {
+                                    Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.multiOnWin);
                                 }else{
-                                    if(betStore.state.increaseOnLose == "true"){
-                                        Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.multiOnLose);
-                                    }else{
-                                        Dispatcher.sendAction('RETURN_BASE_BET');
-                                    }
+                                    Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.multiOnLose);
                                 }
                                 if(betStore.state.automaticToggle){
                                     
@@ -2067,12 +2044,12 @@ var ToggleAutomaticRoll = React.createClass({
                 );
       
     return  el.div(null,
-                el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                el.div({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
                     el.div({className:'automateBackground'},
                             (this.state.waitingForServer) ? buttonStopNode : betHiLowNode
                     )
                   ),
-                  el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                  el.div({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
                       el.p(null, "Limit number of Bets")
                   ),
                 el.div({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
@@ -2126,62 +2103,31 @@ var ToggleAutomaticRoll = React.createClass({
                                       ),
                                       el.span(
                                         {className: 'input-group-addon'},
-                                        'x'
+                                        'Bets'
                                       )
                                     )
                                 )
                             )
                       )   
                   ),
-                  el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                  el.div({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
                       el.p(null, "On Lose")
                   ),
-                el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                el.div({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
                     el.div({className:'automateBackground'},
-                        el.ul({className:'row'},
-                            el.li({className:'col-lg-5 col-md-5 col-sm-6 col-xs-6'},
-                                el.input(
-                                    {
-                                       id: 'radioStyle',
-                                       name: 'returnOnWin',
-                                       type: 'radio',
-                                       defaultChecked: "checked",
-                                       onChange: this._increaseOnLose,
-                                       value: false
-                                    }
-                                    ),
-                                    el.label({className:'radioPureCSS1'},
-                                        el.span(null,
-                                            el.span(null)
-                                        ),
-                                        el.label(null, "Return to Base")
-                                       
-                                    )
-                                ),
-                                el.li({className:'col-lg-7 col-md-7 col-sm-6 col-xs-6'},
-                                el.input(
-                                    {
-                                       id: 'radioStyle',
-                                       name: 'returnOnWin',
-                                       type: 'radio',
-                                       onChange: this._increaseOnLose,
-                                       value: true
-                                    }
-                                    ),
-                                    el.label({className:'radioPureCSS1'},
-                                        el.span(null,
-                                            el.span(null)
-                                        ),
-                                        el.label(null, "Increase Bet")
-                                    ),
-                                    el.label({className:'autoRollInputLabel'}, "x"),
+                        el.div({className:'row'},
+                            el.div({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12 input-group'},
                                     el.input(
                                         {
                                             type:'text',
-                                            className:'returnAmount',
+                                            className:'returnAmount form-control input-lg',
                                             onChange: this._setMultiOnLose,
                                             value: betStore.state.multiOnLose
                                         }
+                                    ),
+                                    el.span(
+                                        {className: 'input-group-addon'},
+                                        'X'
                                     )
                                 )
                             )
