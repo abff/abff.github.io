@@ -2075,10 +2075,10 @@ var ToggleAutomaticRoll = React.createClass({
                   el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
                       el.p(null, "Limit number of Bets")
                   ),
-                el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                el.div({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
                     el.div({className:'automateBackground'},
-                        el.ul({className:'row'},
-                            el.li({className:'col-lg-5 col-md-5 col-sm-6 col-xs-6'},
+                        el.div({className:'row'},
+                            el.div({className:'col-lg-5 col-md-5 col-sm-6 col-xs-6'},
                                 el.input(
                                     {
                                             id: 'radioStyle',
@@ -2097,7 +2097,7 @@ var ToggleAutomaticRoll = React.createClass({
                                        
                                     )
                                 ),
-                                el.li({className:'col-lg-7 col-md-7 col-sm-6 col-xs-6'},
+                                el.div({className:'col-lg-7 col-md-7 col-sm-6 col-xs-6'},
                                 el.input(
                                     {
                                        id: 'radioStyle',
@@ -2113,14 +2113,21 @@ var ToggleAutomaticRoll = React.createClass({
                                         ),
                                         el.label(null, "Amount")
                                     ),
-                                    el.input(
-                                        {
-                                            type:'text',
-                                            className:'autoAmount',
-                                            value: betStore.state.NumberOfBetLimit.str,
-                                            onChange: this._newLimitNumberOfBet,
-                                            disabled: betStore.state.disableNumberOfBet
-                                        }
+                                    el.div(
+                                      {className: 'input-group'},
+                                      el.input(
+                                          {
+                                              type:'text',
+                                              className:'autoAmount form-control input-lg',
+                                              value: betStore.state.NumberOfBetLimit.str,
+                                              onChange: this._newLimitNumberOfBet,
+                                              disabled: betStore.state.disableNumberOfBet
+                                          }
+                                      ),
+                                      el.span(
+                                        {className: 'input-group-addon'},
+                                        'x'
+                                      )
                                     )
                                 )
                             )
