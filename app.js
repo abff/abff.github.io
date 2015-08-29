@@ -491,8 +491,8 @@ var betStore = new Store('bet', {
   automaticToggle: false,
   increaseOnWin: true,
   increaseOnLose: true,
-  multiOnWin:0,
-  multiOnLose:0,
+  multiOnWin:1,
+  multiOnLose:1,
   betCounter: 1,
   checkBoxNumberOfBet: 'false',
   checkSpeedOfBet : 'false',
@@ -2122,7 +2122,7 @@ var ToggleAutomaticRoll = React.createClass({
                       )   
                   ),
                   el.div({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-                      el.p(null, "On Lose")
+                      el.p(null, "Multiplier On Loss")
                   ),
                 el.div({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
                     el.div({className:'automateBackground'},
