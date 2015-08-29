@@ -592,6 +592,7 @@ var betStore = new Store('bet', {
             Dispatcher.sendAction('STOP_ROLL');
         }else if (!isNaN(parseInt(betStore.state.stopMinBalance))) {
             var balance = worldStore.state.user.balance / 100;
+            console.log(balance);
             if (betStore.state.stopMinBalance >= balance) {
               Dispatcher.sendAction('STOP_ROLL');
             }else {
