@@ -627,12 +627,20 @@ var betStore = new Store('bet', {
     });
     Dispatcher.registerCallback("SET_MULTI_ON_WIN", function(multiOnWin){
         var n = parseInt(multiOnWin, 10);
-        betStore.state.multiOnWin = n;
+        if (isNaN(n) || /[^\d]/.test(n.toString())) {
+          self.state.automaticWager.error = 'INVALID_WAGER';
+        }else {
+          betStore.state.multiOnWin = n;
+        }
         self.emitter.emit('change', self.state);
     });
     Dispatcher.registerCallback("SET_MULTI_ON_LOSE", function(multiOnLose){
         var n = parseInt(multiOnLose, 10);
-        betStore.state.multiOnLose = n;
+        if (isNaN(n) || /[^\d]/.test(n.toString())) {
+          self.state.automaticWager.error = 'INVALID_WAGER';
+        }else {
+          betStore.state.multiOnLose = n;
+        }
         self.emitter.emit('change', self.state);
     });
     
