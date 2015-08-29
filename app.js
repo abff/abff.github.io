@@ -2047,11 +2047,11 @@ var ToggleAutomaticRoll = React.createClass({
             } else if (worldStore.state.user) {
                 betHiLowNode =
                 el.ul({className:'row'},
-                    el.li({className: 'col-lg-6 col-md-6 col-sm-6 col-xs-6'},
-                    el.a(
+                    el.div({className: 'col-lg-6 col-md-6 col-sm-6 col-xs-6'},
+                    el.button(
                       {
-                            type:'button',
-                      className: 'blue',
+                      type:'button',
+                      className: 'btn btn-lg btn-primary btn-block',
                       id: 'automateBet-hi',
                       onClick: this._makeBetHandler('>')
                       },
@@ -2061,11 +2061,11 @@ var ToggleAutomaticRoll = React.createClass({
                       )
                     )
                   ),
-                  el.li({className: 'col-lg-6 col-md-6 col-sm-6 col-xs-6'},
-                    el.a(
+                  el.div({className: 'col-lg-6 col-md-6 col-sm-6 col-xs-6'},
+                    el.button(
                       {
-                            type:'button',
-                      className: 'blue',
+                      type:'button',
+                      className: 'btn btn-lg btn-primary btn-block',
                       id: 'automateBet-lo',
                       onClick: this._makeBetHandler('<')
                       },
