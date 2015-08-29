@@ -600,7 +600,7 @@ var betStore = new Store('bet', {
         betStore.state.increaseOnWin = false;
         betStore.state.increaseOnLose = false;
         betStore.state.checkBoxNumberOfBet = false;
-        
+        this.forceUpdate();
         self.emitter.emit('change', self.state);
     });
   
@@ -1793,7 +1793,6 @@ var ToggleAutomaticRoll1 = React.createClass({
     },
     componentDidMount: function() {
         worldStore.on('change', this._onStoreChange);
-        this.forceUpdate();
     },
     componentWillUnmount: function() {
         worldStore.off('change', this._onStoreChange);
