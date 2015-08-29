@@ -589,28 +589,23 @@ var betStore = new Store('bet', {
         console.log('[BetStore] received AUTOMATE_TOGGLE_ROLL');
         betStore.state.automaticToggle = true;
         var balance = worldStore.state.user.balance / 100;
+        var stop = false;
         if(betStore.state.checkBoxNumberOfBet === 'true' && betStore.state.betCounter == self.state.NumberOfBetLimit.str){
-            Dispatcher.sendAction('STOP_ROLL');
-        }else if (!isNaN(parseInt(betStore.state.stopMinBalance))) {
-            console.log(balance);
+            stop = true;
+        } 
+        if (!isNaN(parseInt(betStore.state.stopMinBalance))) {
             if (betStore.state.stopMinBalance >= balance) {
-              Dispatcher.sendAction('STOP_ROLL');
-            }else if (!isNaN(parseInt(betStore.state.stopMaxBalance))) {
-              if (betStore.state.stopMaxBalance <= balance) {
-                Dispatcher.sendAction('STOP_ROLL');
-              }else {
-                betStore.state.betCounter++;
-              } 
-            }else {
-              betStore.state.betCounter++;
-            } 
-        }else if (!isNaN(parseInt(betStore.state.stopMaxBalance))) {
-            if (betStore.state.stopMaxBalance <= balance) {
-              Dispatcher.sendAction('STOP_ROLL');
-            }else {
-              betStore.state.betCounter++;
+              stop = true;
             }
-        }else{
+        }
+        if (!isNaN(parseInt(betStore.state.stopMaxBalance))) {
+            if (betStore.state.stopMaxBalance <= balance) {
+              stop = true;
+            }
+        }
+        if (stop) {
+          Dispatcher.sendAction("STOP_ROLL");
+        }else {
             betStore.state.betCounter++;
         }
         self.emitter.emit('change', self.state);
