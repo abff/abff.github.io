@@ -1449,6 +1449,7 @@ var BetBoxWager = React.createClass({
   _onWagerChange: function(e) {
     var str = e.target.value;
     Dispatcher.sendAction('UPDATE_WAGER', { str: str });
+    this.forceUpdate();
   },
   _onHalveWager: function() {
     var newWager = Math.round(betStore.state.wager.num / 2);
@@ -1849,10 +1850,7 @@ var ToggleAutomaticRoll1 = React.createClass({
   },
   render: function() { 
     return  el.div(null,
-                el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-                    el.h5(null,el.span(null, "Auto-Bet"))
-            ),
-                el.li({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                el.div({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
                     el.div({className:'buttonMoreCenter'},
                         el.button(
                               {
@@ -2050,7 +2048,7 @@ var ToggleAutomaticRoll = React.createClass({
               );
             } else if (worldStore.state.user) {
                 betHiLowNode =
-                el.ul({className:'row'},
+                el.div({className:'row'},
                     el.div({className: 'col-lg-6 col-md-6 col-sm-6 col-xs-6'},
                     el.button(
                       {
