@@ -494,6 +494,8 @@ var betStore = new Store('bet', {
   multiOnWin:1,
   multiOnLose:1,
   betCounter: 1,
+  stopMaxBalance: '',
+  stopMinBalance: '',
   checkBoxNumberOfBet: 'false',
   checkSpeedOfBet : 'false',
   disableNumberOfBet: false,
@@ -588,6 +590,19 @@ var betStore = new Store('bet', {
         betStore.state.automaticToggle = true;
         if(betStore.state.checkBoxNumberOfBet === 'true' && betStore.state.betCounter == self.state.NumberOfBetLimit.str){
             Dispatcher.sendAction('STOP_ROLL');
+        }else if (!isNaN(parseInt(betStore.state.stopMinBalance))) {
+          //if((worldStore.state.user.balance / 100) >= betStore.state.stopMaxBalance || (worldStore.state.user.balance / 100) <= betStore.state.stopMinBalance)
+            if (betStore.state.stopMinBalance >= worldStore.state.user.balance) {
+              Dispatcher.sendAction('STOP_ROLL');
+            }else {
+              betStore.state.betCounter++;
+            } 
+        }else if (!isNaN(parseInt(betStore.state.stopMaxBalance))) {
+            if (betStore.state.stopMaxBalance <= worldStore.state.user.balance) {
+              Dispatcher.sendAction('STOP_ROLL');
+            }else {
+              betStore.state.betCounter++;
+            }
         }else{
             betStore.state.betCounter++;
         }
@@ -644,6 +659,22 @@ var betStore = new Store('bet', {
           betStore.state.multiOnLose = n;
         }
         self.emitter.emit('change', self.state);
+    });
+    Dispatcher.registerCallback("SET_STOP_MAX_BALANCE", function(stopMaxBalance){
+      var n = parseInt(stopMaxBalance, 10);
+      if (isNaN || /[^\d]/.test(n.toString())) {
+        betStore.state.stopMaxBalance = '';
+      }else {
+        betStore.state.stopMaxBalance = n;
+      }
+    });
+    Dispatcher.registerCallback("SET_STOP_MIN_BALANCE", function(stopMinBalance){
+      var n = parseInt(stopMinBalance, 10);
+      if (isNaN || /[^\d]/.test(n.toString())) {
+        betStore.state.stopMinBalance = '';
+      }else {
+        betStore.state.stopMinBalance = n;
+      }
     });
     
     Dispatcher.registerCallback("STOP_ROLL", function(){
@@ -1861,6 +1892,12 @@ var ToggleAutomaticRoll = React.createClass({
       Dispatcher.sendAction("SET_MULTI_ON_LOSE", e.currentTarget.value);
       this.forceUpdate();
   },
+  _setStopMaxBalance: function(e){
+    Dispatcher.sendAction("SET_STOP_MAX_BALANCE", e.currentTarget.value);
+  },
+  _setStopMinBalance: function(e){
+    Dispatcher.sendAction("SET_STOP_MIN_BALANCE", e.currentTarget.value);
+  },
   _newLimitNumberOfBet: function(e){
       console.log(betStore.state.disableNumberOfBet + "nuevo limite");
       var str = e.currentTarget.value;
@@ -2147,7 +2184,7 @@ var ToggleAutomaticRoll = React.createClass({
                       )   
                   ),
                   el.div({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
-                      el.p(null, "Multiplier On Win")
+                      el.p(null, "Stop if balance >")
                   ),
                 el.div({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
                     el.div({className:'automateBackground'},
@@ -2158,13 +2195,38 @@ var ToggleAutomaticRoll = React.createClass({
                                         {
                                             type:'text',
                                             className:'returnAmount form-control input-lg',
-                                            onChange: this._setMultiOnWin,
-                                            value: betStore.state.multiOnWin
+                                            onChange: this._setStopMaxBalance,
+                                            value: betStore.state.stopMaxBalance
                                         }
                                     ),
                                     el.span(
                                         {className: 'input-group-addon'},
-                                        'X'
+                                        'Bits'
+                                    )
+                              ),
+                              el.div({className: 'col-lg-3 col-md-3 col-sm-3 col-xs-3'}, ' ')
+                            )
+                      )   
+                  ),
+                  el.div({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                      el.p(null, "Stop if balance <")
+                  ),
+                  el.div({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+                    el.div({className:'automateBackground'},
+                        el.div({className:'row'},
+                            el.div({className: 'col-lg-3 col-md-3 col-sm-3 col-xs-3'}, ' '),
+                            el.div({className:'col-lg-6 col-md-6 col-sm-6 col-xs-6 input-group'},
+                                    el.input(
+                                        {
+                                            type:'text',
+                                            className:'returnAmount form-control input-lg',
+                                            onChange: this._setStopMixBalance,
+                                            value: betStore.state.stopMixBalance
+                                        }
+                                    ),
+                                    el.span(
+                                        {className: 'input-group-addon'},
+                                        'Bits'
                                     )
                               ),
                               el.div({className: 'col-lg-3 col-md-3 col-sm-3 col-xs-3'}, ' ')
