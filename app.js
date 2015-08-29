@@ -2019,7 +2019,7 @@ var ToggleAutomaticRoll = React.createClass({
                       onClick: this._makeBetHandler('>')
                       },
                       el.span({className: 'bets unselectable', style:{position:'relative'}},
-                        el.span(null,"AUTOMATE HIGH"),
+                        el.span(null,"Go Auto Hi"),
                         el.span({className: 'unselectable autoRateWin'}, '>'+helpers.calcNumber('>',winProb).toFixed(2))
                       )
                     )
@@ -2033,7 +2033,7 @@ var ToggleAutomaticRoll = React.createClass({
                       onClick: this._makeBetHandler('<')
                       },
                       el.span({className: 'bets unselectable', style:{position:'relative'}},
-                        el.span(null,"AUTOMATE LOW"),
+                        el.span(null,"Go Auto Lo"),
                         el.span({className: 'unselectable autoRateWin'}, '<'+helpers.calcNumber('<',winProb).toFixed(2))
                       )
                     )
