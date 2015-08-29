@@ -2117,7 +2117,7 @@ var ToggleAutomaticRoll = React.createClass({
                 el.div({className:'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
                     el.div({className:'automateBackground'},
                         el.div({className:'row'},
-                            el.div({className: 'col-lg-3 col-md-3 col-sm-3 col-xs-3'}, '&nbsp;'),
+                            el.div({className: 'col-lg-3 col-md-3 col-sm-3 col-xs-3'}, ' '),
                             el.div({className:'col-lg-6 col-md-6 col-sm-6 col-xs-6 input-group'},
                                     el.input(
                                         {
@@ -2132,7 +2132,7 @@ var ToggleAutomaticRoll = React.createClass({
                                         'X'
                                     )
                               ),
-                              el.div({className: 'col-lg-3 col-md-3 col-sm-3 col-xs-3'}, '&nbsp;')
+                              el.div({className: 'col-lg-3 col-md-3 col-sm-3 col-xs-3'}, ' ')
                             )
                       )   
                   ),
