@@ -1834,6 +1834,7 @@ var ToggleAutomaticRoll = React.createClass({
     },
     componentDidMount: function() {
         worldStore.on('change', this._onStoreChange);
+        this.forceUpdate();
     },
     componentWillUnmount: function() {
         worldStore.off('change', this._onStoreChange);
@@ -2056,7 +2057,6 @@ var ToggleAutomaticRoll = React.createClass({
                 },
                 'Login with MoneyPot'
                 );
-                this.forceUpdate();
             }
       var buttonStopNode = 
               el.ul({className:'row'},
