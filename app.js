@@ -1854,7 +1854,7 @@ var ToggleAutomaticRoll = React.createClass({
   },
   _increaseOnLose: function(e){
       Dispatcher.sendAction("SET_INCREASE_ON_LOSE", e.currentTarget.value);
-      el.forceUpdate();
+      this.forceUpdate();
   },
     _increaseOnWin: function(e){
         Dispatcher.sendAction("SET_INCREASE_ON_WIN", e.currentTarget.value);
@@ -1865,9 +1865,11 @@ var ToggleAutomaticRoll = React.createClass({
   },
   _setMultiOnWin: function(e){
       Dispatcher.sendAction("SET_MULTI_ON_WIN", e.currentTarget.value);
+      this.forceUpdate();
   },
   _setMultiOnLose: function(e){
       Dispatcher.sendAction("SET_MULTI_ON_LOSE", e.currentTarget.value);
+      this.forceUpdate();
   },
   _newLimitNumberOfBet: function(e){
       console.log(betStore.state.disableNumberOfBet + "nuevo limite");
