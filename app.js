@@ -662,7 +662,7 @@ var betStore = new Store('bet', {
     });
     Dispatcher.registerCallback("SET_STOP_MAX_BALANCE", function(stopMaxBalance){
       var n = parseInt(stopMaxBalance, 10);
-      if (isNaN || /[^\d]/.test(n.toString())) {
+      if (isNaN(n) || /[^\d]/.test(n.toString())) {
         betStore.state.stopMaxBalance = '';
       }else {
         betStore.state.stopMaxBalance = n;
@@ -671,7 +671,7 @@ var betStore = new Store('bet', {
     });
     Dispatcher.registerCallback("SET_STOP_MIN_BALANCE", function(stopMinBalance){
       var n = parseInt(stopMinBalance, 10);
-      if (isNaN || /[^\d]/.test(n.toString())) {
+      if (isNaN(n) || /[^\d]/.test(n.toString())) {
         betStore.state.stopMinBalance = '';
       }else {
         betStore.state.stopMinBalance = n;
