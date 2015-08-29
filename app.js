@@ -2822,7 +2822,8 @@ var App = React.createClass({
         {className: 'row'},
         el.div(
           {className: 'col-sm-5'},
-          React.createElement(BetBox, null)
+          React.createElement(BetBox, null),
+          !betStore.state.showAutomaticRoll ? React.createElement(BetBoxRoll, null) : ''
         ),
         el.div(
           {className: 'col-sm-7'},
