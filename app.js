@@ -588,10 +588,10 @@ var betStore = new Store('bet', {
     Dispatcher.registerCallback('AUTOMATE_TOGGLE_ROLL', function() {
         console.log('[BetStore] received AUTOMATE_TOGGLE_ROLL');
         betStore.state.automaticToggle = true;
+        var balance = worldStore.state.user.balance / 100;
         if(betStore.state.checkBoxNumberOfBet === 'true' && betStore.state.betCounter == self.state.NumberOfBetLimit.str){
             Dispatcher.sendAction('STOP_ROLL');
         }else if (!isNaN(parseInt(betStore.state.stopMinBalance))) {
-            var balance = worldStore.state.user.balance / 100;
             console.log(balance);
             if (betStore.state.stopMinBalance >= balance) {
               Dispatcher.sendAction('STOP_ROLL');
