@@ -653,7 +653,7 @@ var betStore = new Store('bet', {
         var n = parseInt(multiOnWin, 10);
         if (isNaN(n) || /[^\d]/.test(n.toString())) {
           betStore.state.multiOnWin = '';
-          self.state.automaticWager.error = 'INVALID_AUTO_MULTIPLIER';
+          self.state.automaticWager.error = 'INVALID_MULTIPLIER';
         }else {
           betStore.state.multiOnWin = n;
         }
@@ -663,7 +663,7 @@ var betStore = new Store('bet', {
         var n = parseInt(multiOnLose, 10);
         if (isNaN(n) || /[^\d]/.test(n.toString())) {
           betStore.state.multiOnLose = '';
-          self.state.automaticWager.error = 'INVALID_AUTO_MULTIPLIER';
+          self.state.automaticWager.error = 'INVALID_MULTIPLIER';
         }else {
           betStore.state.multiOnLose = n;
         }
@@ -1393,7 +1393,6 @@ var BetBoxMultiplier = React.createClass({
     console.log('You entered', str, 'as your multiplier');
     Dispatcher.sendAction('UPDATE_MULTIPLIER', { str: str });
     this._validateMultiplier(str);
-    Dispatcher.sendAction('START_REFRESHING_USER');
   },
   render: function() {
     return el.div(
@@ -1450,17 +1449,16 @@ var BetBoxWager = React.createClass({
   _onWagerChange: function(e) {
     var str = e.target.value;
     Dispatcher.sendAction('UPDATE_WAGER', { str: str });
-    Dispatcher.sendAction('START_REFRESHING_USER');
+    Dispatcher.sendAction('UPDATE_DOM');
   },
   _onHalveWager: function() {
     var newWager = Math.round(betStore.state.wager.num / 2);
     Dispatcher.sendAction('UPDATE_WAGER', { str: newWager.toString() });
-    Dispatcher.sendAction('START_REFRESHING_USER');
   },
   _onDoubleWager: function() {
     var n = betStore.state.wager.num * 2;
     Dispatcher.sendAction('UPDATE_WAGER', { str: n.toString() });
-    Dispatcher.sendAction('START_REFRESHING_USER');
+
   },
   _onMaxWager: function() {
     // If user is logged in, use their balance as max wager
@@ -1471,7 +1469,6 @@ var BetBoxWager = React.createClass({
       balanceBits = 42000;
     }
     Dispatcher.sendAction('UPDATE_WAGER', { str: balanceBits.toString() });
-    Dispatcher.sendAction('START_REFRESHING_USER');
   },
   //
   render: function() {
@@ -2023,7 +2020,7 @@ var ToggleAutomaticRoll = React.createClass({
     },
   render: function() { 
           var winProb = helpers.multiplierToWinProb(betStore.state.multiplier.num);
-          var error = betStore.state.wager.error || betStore.state.multiplier.error || betStore.state.automaticMultiplier.error;
+          var error = betStore.state.wager.error || betStore.state.multiplier.error;
           var betHiLowNode
             if (worldStore.state.isLoading) {
               // If app is loading, then just disable button until state change
@@ -2040,8 +2037,7 @@ var ToggleAutomaticRoll = React.createClass({
                 'INVALID_MULTIPLIER': 'Invalid multiplier',
                 'MULTIPLIER_TOO_PRECISE': 'Multiplier too precise',
                 'MULTIPLIER_TOO_HIGH': 'Multiplier too high',
-                'MULTIPLIER_TOO_LOW': 'Multiplier too low',
-                'INVALID_AUTO_MULTIPLIER': 'Invalid multi on loss'
+                'MULTIPLIER_TOO_LOW': 'Multiplier too low'
               };
             
               betHiLowNode = el.button(
@@ -2052,7 +2048,7 @@ var ToggleAutomaticRoll = React.createClass({
               );
             } else if (worldStore.state.user) {
                 betHiLowNode =
-                  el.div({className:'row'},
+                el.div({className:'row'},
                     el.div({className: 'col-lg-6 col-md-6 col-sm-6 col-xs-6'},
                     el.button(
                       {
