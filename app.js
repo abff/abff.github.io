@@ -1841,22 +1841,24 @@ var BetBox = React.createClass({
               el.div(
                 {className: 'col-xs-8'},
                 el.span(
-                  {className:'lead', style: { fontWeight: 'bold' }},
-                  'Client Seed: '
+                  {className:'lead', style: { fontWeight: 'bold', text-align: 'center' }},
+                  'Client Seed'
                 ),
+                el.br(),
                 el.input(
                   {
                     type: 'text',
                     value: betStore.state.clientSeed.str,
                     onChange: this._onClientSeedChange,
-                    className: 'form-control input-sm'
+                    className: 'form-control input-md'
                   }
                 )
               ),
               el.div(
                 {className: 'col-xs-2'},
                 ' '
-              )
+              ),
+              el.br()
             ),
             //Autobet
             el.div(
