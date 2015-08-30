@@ -2013,6 +2013,9 @@ var ToggleAutomaticRoll = React.createClass({
                       hash: hash,
                       isFair: CryptoJS.SHA256(bet.secret + '|' + bet.salt).toString() === hash
                     };
+
+                    bet.wager = wagerSatoshis;
+                    bet.uname = worldStore.state.user.uname;
                     
                     Dispatcher.sendAction('CHANGE_TAB', 'MY_BETS');
                     Dispatcher.sendAction('NEW_BET', bet);
