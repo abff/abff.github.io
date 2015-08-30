@@ -491,6 +491,11 @@ var betStore = new Store('bet', {
     str: '1',
     error: undefined
   },
+  clientSeed: {
+    str: initClientSeedNum.toString(),
+    num: initClientSeedNum,
+    error:void 0
+  },
   showAutomaticRoll: false,
   automaticToggle: false,
   increaseOnWin: true,
@@ -555,6 +560,20 @@ var betStore = new Store('bet', {
     }
 
     self.emitter.emit('change', self.state);
+  });
+
+  Dispatcher.registerCallback("UPDATE_CLIENT_SEED",function(t){
+    self.state.clientSeed = _.merge({}, self.state.clientSeed, t);
+    var o = self.state.clientSeed.str, n = parseInt(self.state.clientSeed.str,10);
+    isNaN(n)||/[^\d]/.test(o.toString())?
+    self.state.clientSeed.error = "NOT_INTEGER":0>n?
+    self.state.clientSeed.error = "TOO_LOW":
+    n > Math.pow(2, 32) - 1?
+    self.state.clientSeed.error = "TOO_HIGH":(
+    self.state.clientSeed.error = void 0,
+    self.state.clientSeed.str = n.toString(),
+    self.state.clientSeed.num = n),
+    self.emitter.emit("change", self.state)
   });
 
   Dispatcher.registerCallback('UPDATE_AUTOMATIC_WAGER', function(newWager) {
@@ -1758,6 +1777,7 @@ var HotkeyToggle = React.createClass({
 
 var BetBox = React.createClass({
   displayName: 'BetBox',
+  client_seed: betStore.state.clientSeed.num,
   _onStoreChange: function() {
     this.forceUpdate();
   },
@@ -1767,6 +1787,13 @@ var BetBox = React.createClass({
   componentWillUnmount: function() {
     worldStore.off('change', this._onStoreChange);
   },
+  _onClientSeedChange:function(e){
+    Dispatcher.sendAction("UPDATE_CLIENT_SEED",{str:e.target.value})
+  },
+  _onRefreshClientSeed:function(){
+    var e=helpers.randomUint32();
+    Dispatcher.sendAction("UPDATE_CLIENT_SEED",{num:e,str:e.toString()})
+}
   render: function() {
     return el.div(
       null,
@@ -1803,6 +1830,17 @@ var BetBox = React.createClass({
                 {className: 'col-sm-6'},
                 React.createElement(BetBoxChance, null)
               )
+            ),
+            el.div(
+              {className:'row'},
+              el.input(
+                {
+                  type: 'text',
+                  value: betStore.state.clientSeed.str,
+                  onChange: this._onClientSeedChange,
+                  className: 'form-control'
+                }
+              ),
             ),
             //Autobet
             el.div(
