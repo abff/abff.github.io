@@ -1792,10 +1792,12 @@ var BetBox = React.createClass({
   },
   _onClientSeedChange:function(e){
     Dispatcher.sendAction("UPDATE_CLIENT_SEED",{str:e.target.value})
+    this.forceUpdate();
   },
   _onRefreshClientSeed:function(){
     var e=helpers.randomUint32();
     Dispatcher.sendAction("UPDATE_CLIENT_SEED",{num:e,str:e.toString()})
+    this.forceUpdate();
   },
   render: function() {
     return el.div(
