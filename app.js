@@ -487,12 +487,15 @@ var betStore = new Store('bet', {
       num: 2.00,
       error: undefined
   },
+  multiOnLose: {
+    str: '1',
+    error: undefined
+  },
   showAutomaticRoll: false,
   automaticToggle: false,
   increaseOnWin: true,
   increaseOnLose: true,
   multiOnWin:1,
-  multiOnLose:1,
   betCounter: 1,
   stopMaxBalance: '',
   stopMinBalance: '',
@@ -513,9 +516,6 @@ var betStore = new Store('bet', {
 }, function() {
   var self = this;
 
-  Dispatcher.registerCallback("UPDATE_DOM", function (){
-    self.emitter.emit('change', self.state);
-  });
   Dispatcher.registerCallback('SET_NEXT_HASH', function(hexString) {
     self.state.nextHash = hexString;
     self.emitter.emit('change', self.state);
@@ -653,8 +653,9 @@ var betStore = new Store('bet', {
         var n = parseInt(multiOnWin, 10);
         if (isNaN(n) || /[^\d]/.test(n.toString())) {
           betStore.state.multiOnWin = '';
-          self.state.automaticWager.error = 'INVALID_AUTO_MULTIPLIER';
+          self.state.multiOnLose.error = 'INVALID_AUTO_MULTIPLIER';
         }else {
+          self.state.multiOnLose.error = null;
           betStore.state.multiOnWin = n;
         }
         self.emitter.emit('change', self.state);
@@ -662,10 +663,11 @@ var betStore = new Store('bet', {
     Dispatcher.registerCallback("SET_MULTI_ON_LOSE", function(multiOnLose){
         var n = parseInt(multiOnLose, 10);
         if (isNaN(n) || /[^\d]/.test(n.toString())) {
-          betStore.state.multiOnLose = '';
-          self.state.automaticWager.error = 'INVALID_AUTO_MULTIPLIER';
+          betStore.state.multiOnLose.str = '';
+          betStore.state.multiOnLose.error = 'INVALID_AUTO_MULTIPLIER';
         }else {
-          betStore.state.multiOnLose = n;
+          betStore.state.multiOnLose.error = null;
+          betStore.state.multiOnLose.str = n;
         }
         self.emitter.emit('change', self.state);
     });
@@ -1899,7 +1901,6 @@ var ToggleAutomaticRoll = React.createClass({
   },
   _setMultiOnLose: function(e){
       Dispatcher.sendAction("SET_MULTI_ON_LOSE", e.currentTarget.value);
-      Dispatcher.sendAction("START_REFRESHING_USER");
       this.forceUpdate();
   },
   _setStopMaxBalance: function(e){
@@ -1994,9 +1995,9 @@ var ToggleAutomaticRoll = React.createClass({
                           
                              
                               if(profitBet > 0) {
-                                  Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.multiOnWin);
+                                  Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.multiOnWin.str);
                               }else{
-                                  Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.multiOnLose);
+                                  Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.multiOnLose.str);
                               }
                               if(betStore.state.automaticToggle){
                                   
@@ -2020,7 +2021,7 @@ var ToggleAutomaticRoll = React.createClass({
     },
   render: function() { 
           var winProb = helpers.multiplierToWinProb(betStore.state.multiplier.num);
-          var error = betStore.state.wager.error || betStore.state.multiplier.error || betStore.state.automaticWager.error;
+          var error = betStore.state.wager.error || betStore.state.multiplier.error || betStore.state.multiOnLose.error;
           var betHiLowNode
             if (worldStore.state.isLoading) {
               // If app is loading, then just disable button until state change
@@ -2186,7 +2187,7 @@ var ToggleAutomaticRoll = React.createClass({
                                             type:'text',
                                             className:'returnAmount form-control input-lg',
                                             onChange: this._setMultiOnLose,
-                                            value: betStore.state.multiOnLose
+                                            value: betStore.state.multiOnLose.str
                                         }
                                     ),
                                     el.span(
