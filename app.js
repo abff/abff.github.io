@@ -1856,7 +1856,7 @@ var BetBox = React.createClass({
               el.div(
                 {className: 'col-xs-2'},
                 ' '
-              ),
+              )
             ),
             //Autobet
             el.div(
