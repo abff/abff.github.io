@@ -490,7 +490,7 @@ var betStore = new Store('bet', {
   multiOnLose: {
     str: '1',
     error: undefined
-  }
+  },
   showAutomaticRoll: false,
   automaticToggle: false,
   increaseOnWin: true,
