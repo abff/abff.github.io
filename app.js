@@ -2023,8 +2023,7 @@ var ToggleAutomaticRoll = React.createClass({
     },
   render: function() { 
           var winProb = helpers.multiplierToWinProb(betStore.state.multiplier.num);
-          var error = betStore.state.wager.error || betStore.state.multiplier.error;
-          var error2 = betStore.state.automaticMultiplier.error;
+          var error = betStore.state.wager.error || betStore.state.multiplier.error || betStore.state.automaticWager.error;
           var betHiLowNode
             if (worldStore.state.isLoading) {
               // If app is loading, then just disable button until state change
@@ -2032,7 +2031,7 @@ var ToggleAutomaticRoll = React.createClass({
                     {type: 'button', disabled: true, className: 'btn btn-lg btn-block btn-default'},
                     'Loading...'
                 );
-            } else if (error || error2) {
+            } else if (error) {
               // If there's a betbox error, then render button in error state
             
               var errorTranslations = {
