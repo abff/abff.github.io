@@ -639,7 +639,11 @@ var betStore = new Store('bet', {
     
     
     Dispatcher.registerCallback("AUGMENT_PROFIT", function(multi){
-        var profitQuantity = betStore.state.profitGained.num * Number(multi);
+        if (multi == 0) {
+          var profitQuantity = betStore.state.profitGained.num;
+        }else {
+          var profitQuantity = betStore.state.profitGained.num * Number(multi);
+        }
         var balanceQuantity = worldStore.state.user.balance / 100;
         if(balanceQuantity > profitQuantity){
             betStore.state.profitGained.num = profitQuantity;
