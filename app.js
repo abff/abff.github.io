@@ -664,9 +664,9 @@ var betStore = new Store('bet', {
         var n = parseInt(multiOnLose, 10);
         if (isNaN(n) || /[^\d]/.test(n.toString())) {
           betStore.state.multiOnLose.str = '';
-          self.state.multiOnLose.error = 'INVALID_AUTO_MULTIPLIER';
+          betStore.state.multiOnLose.error = 'INVALID_AUTO_MULTIPLIER';
         }else {
-          self.state.multiOnLose.error = null;
+          betStore.state.multiOnLose.error = null;
           betStore.state.multiOnLose.str = n;
         }
         self.emitter.emit('change', self.state);
