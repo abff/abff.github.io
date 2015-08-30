@@ -1835,7 +1835,7 @@ var BetBox = React.createClass({
             el.div(
               {className:'row'},
               el.div(
-                {className: 'col-xs-2 lead'},
+                {className: 'col-xs-2'},
                 ' '
               ),
               el.div(
