@@ -1840,7 +1840,7 @@ var BetBox = React.createClass({
                   onChange: this._onClientSeedChange,
                   className: 'form-control'
                 }
-              ),
+              )
             ),
             //Autobet
             el.div(
