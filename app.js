@@ -495,7 +495,7 @@ var betStore = new Store('bet', {
   automaticToggle: false,
   increaseOnWin: true,
   increaseOnLose: true,
-  multiOnWin:1,
+  multiOnWin:0,
   betCounter: 1,
   stopMaxBalance: '',
   stopMinBalance: '',
