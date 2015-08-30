@@ -2049,7 +2049,8 @@ var ToggleAutomaticRoll = React.createClass({
             } else if (worldStore.state.user) {
                 betHiLowNode =
                 el.div({className:'row'},
-                    "<br /><br />",
+                    el.br(),
+                    el.br(),
                     el.div({className: 'col-lg-6 col-md-6 col-sm-6 col-xs-6'},
                     el.button(
                       {
@@ -2092,8 +2093,8 @@ var ToggleAutomaticRoll = React.createClass({
                 );
             }
       var buttonStopNode = 
-              el.ul({className:'row'},
-              el.li({className: 'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
+              el.div({className:'row'},
+              el.div({className: 'col-lg-12 col-md-12 col-sm-12 col-xs-12'},
                         
                         el.input(
                             {
