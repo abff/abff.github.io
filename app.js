@@ -1834,7 +1834,7 @@ var BetBox = React.createClass({
             ),
             el.div(
               {className:'row'},
-              el.div({className:'col-xs-2'}),
+              el.div({className:'col-xs-2'}, ' '),
               el.div({className:'col-xs-8'}
                 el.input(
                   {
@@ -1845,7 +1845,7 @@ var BetBox = React.createClass({
                   }
                 )
               ),
-              el.div({className:'col-xs-2'})
+              el.div({className:'col-xs-2'}, ' ')
             ),
             //Autobet
             el.div(
