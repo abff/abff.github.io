@@ -1835,7 +1835,11 @@ var BetBox = React.createClass({
             el.div(
               {className:'row'},
               el.div(
-                {className: 'col-xs-12'},
+                {className: 'col-xs-3'},
+                ' '
+              ),
+              el.div(
+                {className: 'col-xs-6'},
                 el.input(
                   {
                     type: 'text',
@@ -1844,6 +1848,10 @@ var BetBox = React.createClass({
                     className: 'form-control input-lg'
                   }
                 )
+              ),
+              el.div(
+                {className: 'col-xs-3'},
+                ' '
               )
             ),
             //Autobet
