@@ -1835,8 +1835,8 @@ var BetBox = React.createClass({
             el.div(
               {className:'row'},
               el.div(
-                {className: 'col-xs-3'},
-                ' '
+                {className: 'col-xs-4', style: { fontWeight: 'bold' }},
+                'CLient Seed: '
               ),
               el.div(
                 {className: 'col-xs-6'},
@@ -1850,7 +1850,7 @@ var BetBox = React.createClass({
                 )
               ),
               el.div(
-                {className: 'col-xs-3'},
+                {className: 'col-xs-2'},
                 ' '
               )
             ),
