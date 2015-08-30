@@ -492,8 +492,8 @@ var betStore = new Store('bet', {
     error: undefined
   },
   clientSeed: {
-    str: initClientSeedNum.toString(),
-    num: initClientSeedNum,
+    str: '123456772738',
+    num: 123456772738,
     error:void 0
   },
   showAutomaticRoll: false,
