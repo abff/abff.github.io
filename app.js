@@ -495,7 +495,7 @@ var betStore = new Store('bet', {
   automaticToggle: false,
   increaseOnWin: true,
   increaseOnLose: true,
-  multiOnWin:0,
+  multiOnWin: 0,
   betCounter: 1,
   stopMaxBalance: '',
   stopMinBalance: '',
@@ -639,11 +639,7 @@ var betStore = new Store('bet', {
     
     
     Dispatcher.registerCallback("AUGMENT_PROFIT", function(multi){
-        if (multi == 0) {
-          var profitQuantity = betStore.state.profitGained.num;
-        }else {
-          var profitQuantity = betStore.state.profitGained.num * Number(multi);
-        }
+        var profitQuantity = betStore.state.profitGained.num * Number(multi);
         var balanceQuantity = worldStore.state.user.balance / 100;
         if(balanceQuantity > profitQuantity){
             betStore.state.profitGained.num = profitQuantity;
@@ -652,6 +648,9 @@ var betStore = new Store('bet', {
             Dispatcher.sendAction("STOP_ROLL");
         }
         self.emitter.emit('change', self.state);
+    });
+    Dispatcher.registerCallback("RETURN_BASE_BET", function(){
+        betStore.state.profitGained.num = betStore.state.wager.num;
     });
     Dispatcher.registerCallback("SET_MULTI_ON_WIN", function(multiOnWin){
         var n = parseInt(multiOnWin, 10);
@@ -1994,7 +1993,7 @@ var ToggleAutomaticRoll = React.createClass({
                           
                              
                               if(profitBet > 0) {
-                                  Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.multiOnWin);
+                                  Dispatcher.sendAction('RETURN_BASE_BET');
                               }else{
                                   Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.multiOnLose.str);
                               }
