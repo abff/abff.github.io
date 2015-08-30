@@ -563,9 +563,8 @@ var betStore = new Store('bet', {
   });
 
   Dispatcher.registerCallback("UPDATE_CLIENT_SEED",function(t){
-    self.state.clientSeed = _.merge({}, self.state.clientSeed, t);
-    var o = self.state.clientSeed.str, n = parseInt(self.state.clientSeed.str,10);
-    isNaN(n)||/[^\d]/.test(o.toString())?
+    var n = parseInt(t ,10);
+    isNaN(n)||/[^\d]/.test(n.toString())?
     self.state.clientSeed.error = "NOT_INTEGER":0>n?
     self.state.clientSeed.error = "TOO_LOW":
     n > Math.pow(2, 32) - 1?
@@ -1656,7 +1655,7 @@ var BetBoxButton = React.createClass({
     var innerNode;
 
     // TODO: Create error prop for each input
-    var error = betStore.state.wager.error || betStore.state.multiplier.error;
+    var error = betStore.state.wager.error || betStore.state.multiplier.error || betStore.state.clientSeed.error;
 
     if (worldStore.state.isLoading) {
       // If app is loading, then just disable button until state change
@@ -1787,12 +1786,8 @@ var BetBox = React.createClass({
     worldStore.off('change', this._onStoreChange);
   },
   _onClientSeedChange:function(e){
-    Dispatcher.sendAction("UPDATE_CLIENT_SEED",{str:e.target.value})
-    this.forceUpdate();
-  },
-  _onRefreshClientSeed:function(){
-    var e=helpers.randomUint32();
-    Dispatcher.sendAction("UPDATE_CLIENT_SEED",{num:e,str:e.toString()})
+    var str = e.target.value;
+    Dispatcher.sendAction("UPDATE_CLIENT_SEED", str);
     this.forceUpdate();
   },
   render: function() {
@@ -1841,7 +1836,7 @@ var BetBox = React.createClass({
               el.div(
                 {className: 'col-xs-8', style:{textAlign:'center'}},
                 el.span(
-                  {className:'lead'},
+                  {className:'lead', style:{fontWeight:'bold'}},
                   'Client Seed'
                 ),
                 el.input(
@@ -1858,6 +1853,7 @@ var BetBox = React.createClass({
                 ' '
               )
             ),
+            el.br(),
             //Autobet
             el.div(
               {className:'row'},
