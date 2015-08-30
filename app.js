@@ -2023,7 +2023,7 @@ var ToggleAutomaticRoll = React.createClass({
     },
   render: function() { 
           var winProb = helpers.multiplierToWinProb(betStore.state.multiplier.num);
-          var error = betStore.state.wager.error || betStore.state.multiplier.error || betStore.state.automaticMultiplier.error;
+          var error = betStore.state.wager.error || betStore.state.multiplier.error;
           var betHiLowNode
             if (worldStore.state.isLoading) {
               // If app is loading, then just disable button until state change
