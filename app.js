@@ -1835,8 +1835,8 @@ var BetBox = React.createClass({
             el.div(
               {className:'row'},
               el.div(
-                {className: 'col-xs-4', style: { fontWeight: 'bold' }},
-                'CLient Seed: '
+                {className: 'col-xs-4 lead', style: { fontWeight: 'bold' }},
+                'Client Seed: '
               ),
               el.div(
                 {className: 'col-xs-6'},
@@ -1845,7 +1845,7 @@ var BetBox = React.createClass({
                     type: 'text',
                     value: betStore.state.clientSeed.str,
                     onChange: this._onClientSeedChange,
-                    className: 'form-control input-lg'
+                    className: 'form-control input-sm'
                   }
                 )
               ),
