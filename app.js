@@ -1896,7 +1896,7 @@ var ToggleAutomaticRoll = React.createClass({
   },
   _stopRoll: function(){
       Dispatcher.sendAction("STOP_ROLL");
-  }
+  },
   _setMultiOnLose: function(e){
       Dispatcher.sendAction("SET_MULTI_ON_LOSE", e.currentTarget.value);
       Dispatcher.sendAction("START_REFRESHING_USER");
