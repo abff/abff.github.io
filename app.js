@@ -492,8 +492,8 @@ var betStore = new Store('bet', {
     error: undefined
   },
   clientSeed: {
-    str: '123456772738',
-    num: 123456772738,
+    str: '5',
+    num: 5,
     error:void 0
   },
   showAutomaticRoll: false,
@@ -1600,7 +1600,7 @@ var BetBoxButton = React.createClass({
 
       var params = {
         wager: wagerSatoshis,
-        client_seed: 0, // TODO
+        client_seed: betStore.state.clientSeed.num,
         hash: hash,
         cond: cond,
         target: number,
@@ -1777,7 +1777,6 @@ var HotkeyToggle = React.createClass({
 
 var BetBox = React.createClass({
   displayName: 'BetBox',
-  client_seed: betStore.state.clientSeed.num,
   _onStoreChange: function() {
     this.forceUpdate();
   },
@@ -1981,7 +1980,7 @@ var ToggleAutomaticRoll = React.createClass({
                   
                   var params = {
                       wager: wagerSatoshis,
-                      client_seed: 0, // TODO
+                      client_seed: betStore.state.clientSeed.num,
                       hash: hash,
                       cond: cond,
                       target: number,
