@@ -1840,7 +1840,7 @@ var BetBox = React.createClass({
               ),
               el.div(
                 {className: 'col-xs-8'},
-                el.span(
+                el.center(
                   {className:'lead', style:{ fontWeight: 'bold' }},
                   'Client Seed'
                 ),
