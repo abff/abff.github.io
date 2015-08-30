@@ -1844,7 +1844,6 @@ var BetBox = React.createClass({
                   {className:'lead', style: { fontWeight: 'bold', text-align: 'center' }},
                   'Client Seed'
                 ),
-                el.br(),
                 el.input(
                   {
                     type: 'text',
@@ -1858,7 +1857,6 @@ var BetBox = React.createClass({
                 {className: 'col-xs-2'},
                 ' '
               ),
-              el.br()
             ),
             //Autobet
             el.div(
