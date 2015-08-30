@@ -655,6 +655,7 @@ var betStore = new Store('bet', {
           betStore.state.multiOnWin = '';
           self.state.multiOnLose.error = 'INVALID_AUTO_MULTIPLIER';
         }else {
+          self.state.multiOnLose.error = null;
           betStore.state.multiOnWin = n;
         }
         self.emitter.emit('change', self.state);
@@ -665,6 +666,7 @@ var betStore = new Store('bet', {
           betStore.state.multiOnLose.str = '';
           self.state.multiOnLose.error = 'INVALID_AUTO_MULTIPLIER';
         }else {
+          self.state.multiOnLose.error = null;
           betStore.state.multiOnLose.str = n;
         }
         self.emitter.emit('change', self.state);
