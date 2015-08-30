@@ -1834,13 +1834,16 @@ var BetBox = React.createClass({
             ),
             el.div(
               {className:'row'},
-              el.input(
-                {
-                  type: 'text',
-                  value: betStore.state.clientSeed.str,
-                  onChange: this._onClientSeedChange,
-                  className: 'form-control input-lg'
-                }
+              el.div(
+                {className: 'col-xs-12'},
+                el.input(
+                  {
+                    type: 'text',
+                    value: betStore.state.clientSeed.str,
+                    onChange: this._onClientSeedChange,
+                    className: 'form-control input-lg'
+                  }
+                )
               )
             ),
             //Autobet
