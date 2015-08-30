@@ -1833,7 +1833,7 @@ var BetBox = React.createClass({
               )
             ),
             el.div(
-              {className:'col-xs-8'},
+              {className:'row'},
               el.input(
                 {
                   type: 'text',
