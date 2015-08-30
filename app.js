@@ -575,7 +575,7 @@ var betStore = new Store('bet', {
     }else {
       self.state.clientSeed.error = void 0;
       self.state.clientSeed.str = n.toString();
-      self.state.clientSeed.num = n);
+      self.state.clientSeed.num = n;
     }
     self.emitter.emit("change", self.state)
   });
