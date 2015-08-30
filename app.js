@@ -1990,7 +1990,7 @@ var ToggleAutomaticRoll = React.createClass({
                           
                              
                               if(profitBet > 0) {
-                                  Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.multiOnWin.str);
+                                  Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.multiOnWin);
                               }else{
                                   Dispatcher.sendAction('AUGMENT_PROFIT', betStore.state.multiOnLose.str);
                               }
