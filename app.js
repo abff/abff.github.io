@@ -564,15 +564,19 @@ var betStore = new Store('bet', {
 
   Dispatcher.registerCallback("UPDATE_CLIENT_SEED",function(t){
     self.state.clientSeed = _.merge({}, self.state.clientSeed, t);
-    var o = self.state.clientSeed.str, n = parseInt(self.state.clientSeed.str,10);
-    isNaN(n)||/[^\d]/.test(o.toString())?
-    self.state.clientSeed.error = "NOT_INTEGER":0>n?
-    self.state.clientSeed.error = "TOO_LOW":
-    n > Math.pow(2, 32) - 1?
-    self.state.clientSeed.error = "TOO_HIGH":(
-    self.state.clientSeed.error = void 0,
-    self.state.clientSeed.str = n.toString(),
-    self.state.clientSeed.num = n),
+    var o = self.state.clientSeed.str, 
+        n = parseInt(self.state.clientSeed.str,10);
+    if (isNaN(n)||/[^\d]/.test(o.toString())) {
+      self.state.clientSeed.error = "NOT_INTEGER";
+    }else if (0 > n) {
+      self.state.clientSeed.error = "TOO_LOW";
+    }else if (n > Math.pow(2, 32) - 1) {
+      self.state.clientSeed.error = "TOO_HIGH";
+    }else {
+      self.state.clientSeed.error = void 0;
+      self.state.clientSeed.str = n.toString();
+      self.state.clientSeed.num = n);
+    }
     self.emitter.emit("change", self.state)
   });
 
