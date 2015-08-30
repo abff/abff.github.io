@@ -492,8 +492,8 @@ var betStore = new Store('bet', {
     error: undefined
   },
   clientSeed: {
-    str: '5',
-    num: 5,
+    str: '1337',
+    num: 1337,
     error:void 0
   },
   showAutomaticRoll: false,
@@ -1672,7 +1672,8 @@ var BetBoxButton = React.createClass({
         'INVALID_MULTIPLIER': 'Invalid multiplier',
         'MULTIPLIER_TOO_PRECISE': 'Multiplier too precise',
         'MULTIPLIER_TOO_HIGH': 'Multiplier too high',
-        'MULTIPLIER_TOO_LOW': 'Multiplier too low'
+        'MULTIPLIER_TOO_LOW': 'Multiplier too low',
+
       };
 
       innerNode = el.button(
@@ -1844,7 +1845,7 @@ var BetBox = React.createClass({
                     type: 'text',
                     value: betStore.state.clientSeed.str,
                     onChange: this._onClientSeedChange,
-                    className: 'form-control input-sm'
+                    className: 'form-control input-lg'
                   }
                 )
               ),
