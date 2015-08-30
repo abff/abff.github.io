@@ -2044,8 +2044,10 @@ var ToggleAutomaticRoll = React.createClass({
                 'INVALID_AUTO_MULTIPLIER': 'Invalid multi on loss'
               };
             
-              betHiLowNode = el.br(),
-              el.br(),
+              betHiLowNode = 
+              el.span(
+                "<br /><br />"
+              ),
               el.button(
                 {type: 'button',
                  disabled: true,
@@ -2054,8 +2056,9 @@ var ToggleAutomaticRoll = React.createClass({
               );
             } else if (worldStore.state.user) {
                 betHiLowNode =
-                  el.br(),
-                  el.br(),
+                  el.span(
+                    "<br /><br />"
+                  ),
                   el.div({className:'row'},
                     el.div({className: 'col-lg-6 col-md-6 col-sm-6 col-xs-6'},
                     el.button(
