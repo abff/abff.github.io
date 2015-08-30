@@ -1395,7 +1395,6 @@ var BetBoxMultiplier = React.createClass({
     console.log('You entered', str, 'as your multiplier');
     Dispatcher.sendAction('UPDATE_MULTIPLIER', { str: str });
     this._validateMultiplier(str);
-    Dispatcher.sendAction('START_REFRESHING_USER');
   },
   render: function() {
     return el.div(
@@ -1452,17 +1451,14 @@ var BetBoxWager = React.createClass({
   _onWagerChange: function(e) {
     var str = e.target.value;
     Dispatcher.sendAction('UPDATE_WAGER', { str: str });
-    Dispatcher.sendAction('START_REFRESHING_USER');
   },
   _onHalveWager: function() {
     var newWager = Math.round(betStore.state.wager.num / 2);
     Dispatcher.sendAction('UPDATE_WAGER', { str: newWager.toString() });
-    Dispatcher.sendAction('START_REFRESHING_USER');
   },
   _onDoubleWager: function() {
     var n = betStore.state.wager.num * 2;
     Dispatcher.sendAction('UPDATE_WAGER', { str: n.toString() });
-    Dispatcher.sendAction('START_REFRESHING_USER');
   },
   _onMaxWager: function() {
     // If user is logged in, use their balance as max wager
@@ -1473,7 +1469,6 @@ var BetBoxWager = React.createClass({
       balanceBits = 42000;
     }
     Dispatcher.sendAction('UPDATE_WAGER', { str: balanceBits.toString() });
-    Dispatcher.sendAction('START_REFRESHING_USER');
   },
   //
   render: function() {
@@ -2021,7 +2016,7 @@ var ToggleAutomaticRoll = React.createClass({
     },
   render: function() { 
           var winProb = helpers.multiplierToWinProb(betStore.state.multiplier.num);
-          var error = betStore.state.wager.error || betStore.state.multiplier.error || betStore.state.multiOnLose.error;
+          var error = betStore.state.wager.error || betStore.state.multiplier.error;
           var betHiLowNode
             if (worldStore.state.isLoading) {
               // If app is loading, then just disable button until state change
