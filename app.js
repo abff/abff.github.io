@@ -1839,11 +1839,8 @@ var BetBox = React.createClass({
                 ' '
               ),
               el.div(
-                {className: 'col-xs-8'},
-                el.span(
-                  {className:'lead', style:{fontWeight: 'bold', width:'100%', textAlign: 'center'}},
-                  'Client Seed'
-                ),
+                {className: 'col-xs-8', style:{textAlign:'center'}},
+                'Client Seed',
                 el.input(
                   {
                     type: 'text',
